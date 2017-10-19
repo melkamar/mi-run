@@ -124,3 +124,48 @@ to evalnu, takže dostanu hodnotu a (tj. totožné jako prostě `a`)
 Read - in: stream; out: expr
 Eval - in: expr; out: value
 Print - in: stream; out: expr
+
+# Implementace notes
+
+#### Načítání vstupu
+- Mám static buffer pro kratší vstupy, když to nebude stačit, tak mallocuju
+  a pak musím free. Je to ale drahý, proto mám 128 bytů by default, abych si to ušetřil.
+
+- readAtom - načítání jednoho "tokenu" (int, string, symbol).
+  Ty jsou oddělený závorkama, whitespacema a EOF.
+    - pokud je další znak jeden z oddělovačů, tak vytvořím nový atom
+    - jinak prostě přidam znak do bufferu
+
+- pro každej typ atomu mám vlastní funkci, co ho přečte. Pomocí peek
+  zjistim jakej atom bude a pak zavolam odpovídající funkci.
+
+- objekty jako třeba nil budou singletony, nemá cenu je alokovat pořád dokola
+
+#### eval
+
+Viz scm_eval()
+
+- list znamená function call
+- symbol -> value of symbol
+- něco jinýho -> eval sám sebe (int, str, #f, #t atd)
+
+- Pro symboly potřebujeme key-value tabulku `global environment`:
+    - key: reference na symbol
+    - value: reference na hodnotu/referenci přiřazenou danému symbolu
+
+    - bude to hashtable, klíč bude hash symbolu
+
+    - Ale abychom nemuseli pořád hashovat, budem adresovat adresou danýho
+    symbolu v paměti. Symbol je tedy singleton, chci jen jeden. Proto
+    funkce `getOldSymbolOrNil` a `rememberSymbol`. To je v podstatě
+    string-hashed table. Takže hledání symbolu je dražší při jeho čtení
+    ze vstupu, ale jak ho jednou mám v AST, je přístup do symbol table
+    easy, protože prostě vezmu adresu v paměti.
+
+dummy20 symbol string - jen pro debugging, jinak se při breakpointu
+zobrazoval jen jeden char (protože je pole staticky definovaný jako 1
+prvek).
+
+Předávání parametrů naším funkcím se nedělá přes C parametry - nevím
+kolik parametrů bude která funkce mít. Na to radši uděláme vlastní
+stack. To bude flexibilnější a efektivnější než varargs.
