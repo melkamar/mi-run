@@ -4,6 +4,9 @@
 OBJ *stack = NULL;
 int SP = 0, currentStackSize = 0;
 
+VOIDPTRFUNC *returnStack = NULL;
+int RSP = 0, currentReturnStackSize = 0;
+
 void
 initializeStack() {
     stack = (OBJ *)malloc(sizeof(OBJ) * INITIAL_STACK_SIZE);
@@ -14,7 +17,20 @@ initializeStack() {
 void
 growStack() {
     currentStackSize = currentStackSize * 2;
-    stack = (OBJ*)realloc(stack, sizeof(OBJ) * INITIAL_STACK_SIZE);
+    stack = (OBJ*)realloc(stack, sizeof(OBJ) * currentStackSize);
+}
+
+void
+initializeReturnStack() {
+    returnStack = (VOIDPTRFUNC *)malloc(sizeof(VOIDPTRFUNC) * INITIAL_STACK_SIZE);
+    currentReturnStackSize = INITIAL_STACK_SIZE;
+    RSP = 0;
+}
+
+void
+growReturnStack() {
+    currentReturnStackSize = currentReturnStackSize * 2;
+    returnStack = (VOIDPTRFUNC*)realloc(returnStack, sizeof(VOIDPTRFUNC) * currentReturnStackSize);
 }
 
 OBJ

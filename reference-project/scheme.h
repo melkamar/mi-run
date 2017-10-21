@@ -82,7 +82,7 @@ struct schemeStringStream {
 
 typedef OBJ (*OBJFUNC)();
 // typedef void (*VOIDFUNC)();
-// typedef void* (*VOIDPTRFUNC)();
+typedef void* (*VOIDPTRFUNC)();
 // typedef VOIDPTRFUNC (*VOIDPTRFUNCFUNC)();
 
 struct schemeBuiltinFunction {
@@ -152,8 +152,14 @@ OBJ SCM_EOF;
 OBJ SCM_VOID;
 
 extern OBJ globalEnvironment;
+
 extern OBJ *stack;
 extern int SP, currentStackSize;
+
+extern VOIDPTRFUNC *returnStack;
+extern int RSP, currentReturnStackSize;
+
+OBJ RETVAL;
 
 // #define integerVal(o)   ((o)->u.intVal)
 
@@ -255,3 +261,41 @@ POP() {
     }
     return stack[--SP];
 }
+
+static inline
+PUSH_RET(VOIDPTRFUNC retAddr) {
+    returnStack[RSP++] = retAddr;
+    if (RSP >= currentReturnStackSize) {
+	growReturnStack();
+    }
+}
+
+static inline VOIDPTRFUNC
+POP_RET() {
+    if (RSP == 0) {
+	fatal("oops - return stack underflow");
+    }
+    return returnStack[--RSP];
+}
+
+#define CALL(fn, cont) \
+    { \
+	PUSH_RET((VOIDPTRFUNC)cont); \
+	return (VOIDPTRFUNC)fn;      \
+    }
+
+#define TCALL(fn) \
+    { \
+	return (VOIDPTRFUNC)fn;      \
+    }
+
+#define JUMP(fn) \
+    { \
+	return (VOIDPTRFUNC)fn;      \
+    }
+
+#define RETURN(retVal) \
+    { \
+	RETVAL = retVal; \
+	return (VOIDPTRFUNC)POP_RET();      \
+    }

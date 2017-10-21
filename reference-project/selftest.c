@@ -1,5 +1,7 @@
 #include "scheme.h"
 
+static VOIDPTRFUNC f();
+
 void
 selftest() {
     OBJ o, o1, o2, rslt;
@@ -294,4 +296,60 @@ selftest() {
     rslt = scm_evalCString("(= (* -10 -10) 100)");
     assert_true(rslt, "* result wrong");
 
+    //
+    printf("testing trampoline...\n");
+    {
+	VOIDPTRFUNC f();
+
+	trampoline(f);
+	printf("after test of trampoline...\n");
+    }
+}
+
+static VOIDPTRFUNC f1();
+static VOIDPTRFUNC g();
+static VOIDPTRFUNC f2();
+static VOIDPTRFUNC h();
+static VOIDPTRFUNC i();
+
+static VOIDPTRFUNC
+f() {
+    printf("here f\n");
+    CALL(g, f1);
+    // never reached
+}
+
+static VOIDPTRFUNC
+f1() {
+    printf("back in f(1)\n");
+    CALL(h, f2);
+    // never reached
+}
+
+static VOIDPTRFUNC
+f2() {
+    printf("back in f(2)\n");
+    RETURN(SCM_TRUE);
+    // never reached
+}
+
+static VOIDPTRFUNC
+g() {
+    printf("here in g\n");
+    RETURN(SCM_FALSE);
+    // never reached
+}
+
+static VOIDPTRFUNC
+h() {
+    printf("here in h\n");
+    TCALL(i);
+    // never reached
+}
+
+static VOIDPTRFUNC
+i() {
+    printf("here in i\n");
+    RETURN(SCM_FALSE);
+    // never reached
 }

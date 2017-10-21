@@ -20,6 +20,7 @@ OBJ new_userDefinedFunction(OBJ argList, OBJ bodyList, OBJ homeEnv);
 OBJ new_globalEnvironment(int size);
 
 void growStack();
+void growReturnStack();
 
 OBJ getOldSymbolOrNil(char* symbolsChars);
 void rememberSymbol(OBJ theSymbol);
@@ -36,6 +37,7 @@ int nextPrimeAfter(int nr);
 void initializeSymbolTable();
 void initializeGlobalEnvironment();
 void initializeStack();
+void initializeReturnStack();
 void initializeBuiltinFunctions();
 void initializeBuiltinSyntax();
 
@@ -44,3 +46,7 @@ void defineGlobalValue(OBJ env, OBJ symbol, OBJ newValue);
 
 void defineBuiltinFunction(char* name, OBJFUNC code);
 void defineBuiltinSyntax(char* name, OBJFUNC code);
+
+void trampoline(VOIDPTRFUNC fn);
+VOIDPTRFUNC CP_readEvalPrintLoop();
+VOIDPTRFUNC CP_scm_eval();

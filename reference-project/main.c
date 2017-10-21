@@ -39,6 +39,7 @@ main(int argc, char **argv) {
     OBJ stdInputStream = new_fileStream(stdin);
 
     initializeStack();
+    initializeReturnStack();
     initializeSymbolTable();
     initializeGlobalEnvironment();
     initializeWellknownObjects();
@@ -66,5 +67,18 @@ main(int argc, char **argv) {
     if (setjmp(getMeBackToMain) != 0) {
 	printf("back in REPL after error\n");
     }
-    readEvalPrintLoop(stdInputStream, C_TRUE);
+
+    PUSH(stdInputStream);
+    PUSH(SCM_TRUE);
+    trampoline((VOIDPTRFUNC)CP_readEvalPrintLoop);
+//    readEvalPrintLoop(stdInputStream, C_TRUE);
+}
+
+void
+trampoline(VOIDPTRFUNC fn) {
+    PUSH_RET(NULL);
+
+    do {
+	fn = (*fn)();
+    } while(fn != NULL);
 }

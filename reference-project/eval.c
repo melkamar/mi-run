@@ -29,6 +29,58 @@ readEvalPrintLoop(OBJ inStream, bool doPrompt) {
     }
 }
 
+static VOIDPTRFUNC CP_readEvalPrintLoop_1();
+
+VOIDPTRFUNC
+CP_readEvalPrintLoop() {
+    OBJ inStream, doPrompt;
+    OBJ expr;
+
+    doPrompt = POP();
+    inStream = POP();
+
+    if (doPrompt == SCM_TRUE) {
+	printf("> ");
+    }
+    expr = scm_read(inStream);
+    if (expr == SCM_EOF) {
+	return;
+    }
+
+    PUSH(inStream);
+    PUSH(doPrompt);
+
+    PUSH(expr);
+    PUSH(globalEnvironment);
+    CALL(CP_scm_eval, CP_readEvalPrintLoop_1);
+    // never reached
+}
+
+// coming back from the call to:
+// scm_eval(expr, globalEnvironment);
+
+static VOIDPTRFUNC
+CP_readEvalPrintLoop_1() {
+    OBJ doPrompt;
+    OBJ inStream;
+    OBJ evaluatedResult;
+
+    doPrompt = POP();
+    inStream = POP();
+
+    evaluatedResult = RETVAL;
+    if (evaluatedResult != SCM_VOID) {
+	scm_print(evaluatedResult, stdout);
+	printf("\n");
+    }
+
+    PUSH(inStream);
+    PUSH(doPrompt);
+    JUMP(CP_readEvalPrintLoop);
+    // TCALL(CP_readEvalPrintLoop);
+}
+
+
 OBJ
 scm_evalSymbol(OBJ expr, OBJ env) {
     OBJ valOrNULL = getGlobalValue(env, expr);
@@ -141,6 +193,11 @@ scm_evalList(OBJ expr, OBJ env) {
     }
 }
 
+VOIDPTRFUNC
+CP_scm_evalList() {
+    fatal("uniml");
+}
+
 OBJ
 scm_eval(OBJ expr, OBJ env) {
     OBJ result;
@@ -169,6 +226,42 @@ scm_eval(OBJ expr, OBJ env) {
 	printf("--> "); scm_print(result, stdout); printf("\n");
     }
     return result;
+}
+
+VOIDPTRFUNC
+CP_scm_eval() {
+    OBJ expr, env;
+
+    env = POP();
+    expr = POP();
+
+    if (trace) {
+	spaces(traceLevel);
+	printf("eval: "); scm_print(expr, stdout); printf("\n");
+    }
+
+    switch (tagOf(expr)) {
+	case T_SYMBOL:
+	    {
+		OBJ valOrNULL = getGlobalValue(env, expr);
+
+		if (valOrNULL == NULL) {
+		    error("undefined variable:", expr);
+		}
+		RETURN( valOrNULL );
+	    }
+	    // not reached
+
+	case T_CONS:
+	    PUSH(expr);
+	    PUSH(env);
+	    TCALL(CP_scm_evalList)
+	    // not reached
+
+	default:
+	    RETURN(expr);
+	    // not reached
+    }
 }
 
 OBJ
