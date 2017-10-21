@@ -169,3 +169,54 @@ prvek).
 Předávání parametrů naším funkcím se nedělá přes C parametry - nevím
 kolik parametrů bude která funkce mít. Na to radši uděláme vlastní
 stack. To bude flexibilnější a efektivnější než varargs.
+
+#### if
+
+- nemůže to bejt jenom klasická builtin function, protože ta evaluuje všechny svoje
+  argumenty. Tady ale chceme evaluovat jenom jednu z nich.
+- Proto je to odlišný konstrukt - builtinSyntax.c
+
+#### print
+
+- kvůli printování definujeme tag T_VOID - pokud dostanu tenhle typ z
+  funkce, tak neprintuju nic. Jinak by se mi dělo tohle:
+```
+> (if #t 10 20)
+10()
+```
+
+#### degenerovaný list
+
+pokud mám `(cons 1 2)`, tak to není list, protože to nemá
+null-terminated element. Je to degenerovaný list, a má se to printit jako
+`(1 . 2)`.
+
+
+### Lambda
+
+- Pro definování funkcí potřebujeme, aby eval nepracoval by default
+s global environmentem, ale bral jako parametr custom environment.
+- Pro vykonání funkce vytvořím nový environment a naplním jména
+parametrů fce jejíma hodnotama.
+
+
+### Closure
+Můžu vytvářet lambdy co vrací další lambdy. K tomu ale musím dědit
+environmenty. Když v lambdě a vytvořím další lambdu b, tak ta nemůže
+mít jako parenta global env, ale env tý funkce, kde byla vytvořená.
+
+-> userdefinedfunction # homeenvironment
+
+### Error handling
+
+pomocí setjmp longjmp - uložím si stack frame/env, a potom kde je error, budu loadovat tenhle env
+
+pokud setjmp vrátí 0, pak je to první průchod - ok.
+pokud vrátí něco jinýho, pak se z něj vracím nějakým errorem.
+
+### Continuation passing
+
+- způsob jak fixnout hlubokou rekurzi - pokud je tail rekurze,
+tak se dá obejít bez alokování dalších a dalších stacků
+
+- bootstrap "trampoline" - volá první funkci na stacku
