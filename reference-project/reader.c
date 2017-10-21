@@ -1,5 +1,6 @@
 #include "scheme.h"
 #include <string.h>
+#include <errno.h>
 
 int
 scm_readOrPeekCharacter(OBJ inStream, bool doRead) {
@@ -20,7 +21,18 @@ scm_readOrPeekCharacter(OBJ inStream, bool doRead) {
 		if (feof(f)) {
 		    return STREAM_EOF;
 		}
-		retChar = getc(f);
+
+		// notice the EINTR (interrupted call) handling here
+		// this allows the debugger (gdb) to interrupt me while reading
+		// and continuing afterwards.
+		do {
+		    clearerr(f);
+		    retChar = getc(f);
+		} while ((retChar == -1)
+			 // -- this should , but does not work on OSX
+			 // && (ferror(f) /* errno */ == EINTR)
+			 && (errno == EINTR));
+
 		if (!doRead) {
 		    inStream->fileStream.lookaheadChar = retChar;
 		}
@@ -56,6 +68,15 @@ scm_readCharacter(OBJ inStream) {
 int
 scm_peekCharacter(OBJ inStream) {
     return scm_readOrPeekCharacter(inStream, C_FALSE);
+}
+
+static void
+scm_skipToEndOfLine(OBJ inStream) {
+    int ch;
+
+    do {
+	ch = scm_readCharacter(inStream);
+    } while (ch != '\n');
 }
 
 void
@@ -116,6 +137,24 @@ scm_readList(OBJ inStream) {
 	return SCM_NIL;
     }
     firstElement = scm_read(inStream);
+
+    skipWhitespace(inStream);
+    ch = scm_peekCharacter(inStream);
+    if (ch == '.') {
+	OBJ cdrExpr;
+
+	scm_advanceReadPointer(inStream);
+	cdrExpr = scm_read(inStream);
+
+	skipWhitespace(inStream);
+	ch = scm_peekCharacter(inStream);
+	if (ch != ')') {
+	    error("bad list (expected ')')", NULL);
+	}
+	scm_advanceReadPointer(inStream);
+	return new_cons(firstElement, cdrExpr);
+    }
+
     restList = scm_readList(inStream);
     return new_cons(firstElement, restList);
 }
@@ -207,7 +246,9 @@ scm_readAtom(OBJ inStream) {
 
 		    freeBuffer(&b);
 		    if ((allDigits(theCollectedString))
-		     || ((theCollectedString[0] == '-') && allDigits(theCollectedString+1))) {
+		     || ((theCollectedString[0] == '-')
+			    && (theCollectedString[1] != '\0')
+			    && allDigits(theCollectedString+1))) {
 			return convert_to_integer(theCollectedString);
 		    }
 		    return new_symbol(theCollectedString);
@@ -267,6 +308,20 @@ scm_read(OBJ inStream) {
     for (;;) {
 	ch = scm_peekCharacter(inStream);
 	switch (ch) {
+	    case ';':
+		scm_skipToEndOfLine(inStream);
+		continue;
+
+	    case '\'':
+		{
+		    OBJ e;
+
+		    scm_advanceReadPointer(inStream);
+		    e = scm_read(inStream);
+		    return new_cons(
+				new_symbol("quote"),
+				new_cons(e, SCM_NIL));
+		}
 	    case ' ':
 	    case '\t':
 	    case '\n':

@@ -1,26 +1,43 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "parameters.h"
+
 typedef unsigned char bool;
 #define C_TRUE 1
 #define C_FALSE 0
 
 typedef enum schemeTag {
+    T_UNUSED = 0,
+    T_SMALLINTEGER = 1,
     T_INTEGER,
-    // T_FLOAT,
+    T_BIGINTEGER,
+    T_FLOAT,
+    T_FRACTION,
     T_STRING,
     T_CONS,
     T_NIL,
     T_TRUE,
     T_FALSE,
     T_EOF,
+    T_VOID,
     T_SYMBOL,
     T_FILESTREAM,
     T_STRINGSTREAM,
     T_BUILTINFUNCTION,
+    T_BUILTINSYNTAX,
+    T_GLOBALENVIRONMENT,
+    T_LOCALENVIRONMENT,
+    T_USERDEFINEDFUNCTION,
 } schemeTag;
 
 typedef union schemeObject *OBJ;
+
+struct envEntry {
+    OBJ key;
+    OBJ value;
+};
+typedef struct envEntry envEntry;
 
 struct schemeInteger {
     enum schemeTag tag;
@@ -74,6 +91,34 @@ struct schemeBuiltinFunction {
     char *nameString;
 };
 
+struct schemeBuiltinSyntax {
+    enum schemeTag tag;
+    OBJFUNC code;
+    char *nameString;
+};
+
+struct schemeUserDefinedFunction {
+    enum schemeTag tag;
+    OBJ argList;
+    OBJ bodyList;
+    OBJ homeEnvironment;
+};
+
+struct schemeGlobalEnvironment {
+    enum schemeTag tag;
+    OBJ parentEnvironment;
+    envEntry *entries;
+    int size;
+    int fillCount;
+};
+
+struct schemeLocalEnvironment {
+    envEntry quickEntries[NUM_QUICK_LOCALENV_ENTRIES];
+    int size;
+    int fillcount;
+    envEntry *moreEntries;
+};
+
 struct schemeAny {
     enum schemeTag tag;
 };
@@ -87,9 +132,28 @@ union schemeObject {
     struct schemeStringStream stringStream;
     struct schemeAny any;
     struct schemeBuiltinFunction builtinFunction;
+    struct schemeBuiltinSyntax builtinSyntax;
+    struct schemeUserDefinedFunction userDefinedFunction;
+    struct schemeGlobalEnvironment globalEnvironment;
 
     struct schemeString20 dummy20;
 };
+
+#include "functionPrototypes.h"
+#include "assertions.h"
+
+#define STREAM_EOF  -1
+
+/// globals
+OBJ SCM_NIL;
+OBJ SCM_TRUE;
+OBJ SCM_FALSE;
+OBJ SCM_EOF;
+OBJ SCM_VOID;
+
+extern OBJ globalEnvironment;
+extern OBJ *stack;
+extern int SP, currentStackSize;
 
 // #define integerVal(o)   ((o)->u.intVal)
 
@@ -111,6 +175,23 @@ hasTag(OBJ o, schemeTag tag) {
 static inline bool
 isInteger(OBJ o) {
     return hasTag(o, T_INTEGER);
+}
+
+static inline bool
+isFloat(OBJ o) {
+    return hasTag(o, T_FLOAT);
+}
+
+static inline bool
+isFraction(OBJ o) {
+    return hasTag(o, T_FRACTION);
+}
+
+static inline bool
+isNumber(OBJ o) {
+    return isInteger(o)
+	   || isFloat(o)
+	   || isFraction(o);
 }
 
 static inline bool
@@ -159,30 +240,6 @@ cdr(OBJ o) {
     return o->cons.cdr;
 }
 
-#include "functionPrototypes.h"
-
-#define STREAM_EOF  -1
-
-#define _assert(cond, msg, filename, lineNr) \
-    { \
-	if (! (cond)) { \
-	    fprintf(stderr, "%s[%d]: assertion failed: %s\n", filename, lineNr, msg); \
-	    abort(); \
-	} \
-    }
-
-#define assert(cond, message) _assert(cond, message, __FILE__, __LINE__)
-
-/// globals
-OBJ SCM_NIL;
-OBJ SCM_TRUE;
-OBJ SCM_FALSE;
-OBJ SCM_EOF;
-extern OBJ *stack;
-extern int SP, currentStackSize;
-
-extern void growStack();
-
 static inline
 PUSH(OBJ o) {
     stack[SP++] = o;
@@ -198,5 +255,3 @@ POP() {
     }
     return stack[--SP];
 }
-
-#include "parameters.h"

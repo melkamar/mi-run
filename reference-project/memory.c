@@ -2,7 +2,7 @@
 #include <string.h>
 
 OBJ *stack = NULL;
-int SP, currentStackSize;
+int SP = 0, currentStackSize = 0;
 
 void
 initializeStack() {
@@ -13,7 +13,8 @@ initializeStack() {
 
 void
 growStack() {
-    fatal("as yet unimpl");
+    currentStackSize = currentStackSize * 2;
+    stack = (OBJ*)realloc(stack, sizeof(OBJ) * INITIAL_STACK_SIZE);
 }
 
 OBJ
@@ -60,9 +61,32 @@ new_builtinFunction(OBJFUNC func, char* name) {
 }
 
 OBJ
+new_builtinSyntax(OBJFUNC func, char* name) {
+    OBJ newObj;
+
+    newObj = (OBJ)malloc(sizeof(struct schemeBuiltinSyntax));
+    newObj->builtinSyntax.tag = T_BUILTINSYNTAX;
+    newObj->builtinSyntax.code = func;
+    newObj->builtinSyntax.nameString = name;
+    return newObj;
+}
+
+OBJ
+new_userDefinedFunction(OBJ argList, OBJ bodyList, OBJ homeEnv) {
+    OBJ newObj;
+
+    newObj = (OBJ)malloc(sizeof(struct schemeUserDefinedFunction));
+    newObj->userDefinedFunction.tag = T_USERDEFINEDFUNCTION;
+    newObj->userDefinedFunction.argList = argList;
+    newObj->userDefinedFunction.bodyList = bodyList;
+    newObj->userDefinedFunction.homeEnvironment = homeEnv;
+    return newObj;
+}
+
+OBJ
 really_new_symbol(char* symChars) {
     OBJ newObj;
-    int len = strlen(symChars);
+    int len = (int)(strlen(symChars));
 
     newObj = (OBJ)malloc(sizeof(struct schemeSymbol) + len - 1 /* one too many - see struct */
 							   + 1 /* zero byte */ );
@@ -86,7 +110,7 @@ new_symbol(char* symChars) {
 OBJ
 new_string(char* symChars) {
     OBJ newObj;
-    int len = strlen(symChars);
+    int len = (int)(strlen(symChars));
 
     newObj = (OBJ)malloc(sizeof(struct schemeSymbol) + len - 1 /* one too many - see struct */
 							   + 1 /* zero byte */ );
@@ -113,5 +137,19 @@ new_cons(OBJ car, OBJ cdr) {
     newObj->cons.tag = T_CONS;
     newObj->cons.car = car;
     newObj->cons.cdr = cdr;
+    return newObj;
+}
+
+OBJ
+new_globalEnvironment(int size) {
+    OBJ newObj;
+
+    newObj = (OBJ)malloc(sizeof(struct schemeGlobalEnvironment));
+    newObj->globalEnvironment.tag = T_GLOBALENVIRONMENT;
+    newObj->globalEnvironment.entries = (envEntry *)malloc(sizeof(envEntry) * size);
+    memset(newObj->globalEnvironment.entries, 0, (sizeof(envEntry) * size));
+    newObj->globalEnvironment.size = size;
+    newObj->globalEnvironment.fillCount = 0;
+    newObj->globalEnvironment.parentEnvironment = NULL;
     return newObj;
 }

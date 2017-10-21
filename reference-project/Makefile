@@ -1,9 +1,10 @@
 # initial makefile, automatically generated.
 #
 OBJS=main.o reader.o eval.o print.o utils.o selftest.o \
-     memory.o symbols.o environment.o arithmetic.o listFunctions.o
+     memory.o symbols.o environment.o builtinFunctions.o \
+     builtinSyntax.o
 
-HEADERS=scheme.h functionPrototypes.h
+HEADERS=scheme.h functionPrototypes.h assertions.h parameters.h
 CFLAGS=-g
 
 all: scheme
