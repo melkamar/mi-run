@@ -1,3 +1,12 @@
+//////////////////////////////////////////////////////////////////
+//
+// Copyright 2017 Claus Gittinger
+//
+// You may use this, but not claim to have written or own it!
+// Use at your own risk.
+//
+//////////////////////////////////////////////////////////////////
+
 #include "scheme.h"
 
 static void
@@ -113,18 +122,19 @@ scm_printOrDisplay(OBJ expr, FILE* outStream, bool doDisplay) {
 	    return;
 
 	case T_USERDEFINEDFUNCTION:
+	case T_BYTECODEFUNCTION:
 	    fprintf(outStream, "(lambda ");
 	    scm_printOrDisplay(expr->userDefinedFunction.argList, outStream, doDisplay);
 	    fprintf(outStream, " ");
 	    scm_printList(expr->userDefinedFunction.bodyList, outStream, doDisplay);
 	    return;
 
-	case T_GLOBALENVIRONMENT:
-	    fprintf(outStream, "<the global env>");
-	    return;
-
-	case T_LOCALENVIRONMENT:
-	    fprintf(outStream, "<an env>");
+	case T_ENVIRONMENT:
+	    if (expr == globalEnvironment) {
+		fprintf(outStream, "<the global environment>");
+	    } else {
+		fprintf(outStream, "<environment>");
+	    }
 	    return;
 
 	default:

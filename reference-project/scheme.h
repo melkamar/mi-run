@@ -1,3 +1,12 @@
+//////////////////////////////////////////////////////////////////
+//
+// Copyright 2017 Claus Gittinger
+//
+// You may use this, but not claim to have written or own it!
+// Use at your own risk.
+//
+//////////////////////////////////////////////////////////////////
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -26,8 +35,8 @@ typedef enum schemeTag {
     T_STRINGSTREAM,
     T_BUILTINFUNCTION,
     T_BUILTINSYNTAX,
-    T_GLOBALENVIRONMENT,
-    T_LOCALENVIRONMENT,
+    T_BYTECODEFUNCTION,
+    T_ENVIRONMENT,
     T_USERDEFINEDFUNCTION,
 } schemeTag;
 
@@ -107,21 +116,16 @@ struct schemeUserDefinedFunction {
     OBJ argList;
     OBJ bodyList;
     OBJ homeEnvironment;
+    unsigned char* bytecode;
+    OBJ *constantTable;
 };
 
-struct schemeGlobalEnvironment {
+struct schemeEnvironment {
     enum schemeTag tag;
     OBJ parentEnvironment;
     envEntry *entries;
     int size;
     int fillCount;
-};
-
-struct schemeLocalEnvironment {
-    envEntry quickEntries[NUM_QUICK_LOCALENV_ENTRIES];
-    int size;
-    int fillcount;
-    envEntry *moreEntries;
 };
 
 struct schemeAny {
@@ -139,7 +143,7 @@ union schemeObject {
     struct schemeBuiltinFunction builtinFunction;
     struct schemeBuiltinSyntax builtinSyntax;
     struct schemeUserDefinedFunction userDefinedFunction;
-    struct schemeGlobalEnvironment globalEnvironment;
+    struct schemeEnvironment environment;
 
     struct schemeString20 dummy20;
 };
@@ -218,6 +222,11 @@ isCons(OBJ o) {
 static inline bool
 isSymbol(OBJ o) {
     return hasTag(o, T_SYMBOL);
+}
+
+static inline bool
+isUserDefinedFunction(OBJ o) {
+    return hasTag(o, T_USERDEFINEDFUNCTION);
 }
 
 

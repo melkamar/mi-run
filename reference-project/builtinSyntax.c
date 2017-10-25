@@ -35,6 +35,10 @@ OBJ
 builtin_quote(int indexOfFirstArg, OBJ env, OBJ unevaluatedArgList) {
     OBJ unevaluatedCond = ARG(0);
 
+    if (NUMARGS() != 1) {
+	argumentCountError("quote", 1, NUMARGS(), C_FALSE);
+    }
+
     POPARGS();
     return unevaluatedCond;
 }
@@ -96,14 +100,30 @@ builtin_define(int indexOfFirstArg, OBJ env, OBJ unevaluatedArgList) {
 	definedValue = evaluatedExpr;
     }
 
-    defineGlobalValue(env, name, definedValue);
+    defineOrSetValue(env, name, definedValue, C_TRUE);
     POPARGS();
     return SCM_VOID;
 }
 
 OBJ
 builtin_set(int indexOfFirstArg, OBJ env, OBJ unevaluatedArgList) {
-    fatal("unimpl.");
+    OBJ name;
+    OBJ unevaluatedExpr, evaluatedExpr;
+
+    if (NUMARGS() != 2) {
+	argumentCountError("set!", 2, NUMARGS(), C_FALSE);
+    }
+    name = ARG(0);
+    unevaluatedExpr = ARG(1);
+
+    if (!isSymbol(name)) {
+	error("[define] name must be a symbol", NULL);
+    }
+
+    evaluatedExpr = scm_eval(unevaluatedExpr, env);
+    defineOrSetValue(env, name, evaluatedExpr, C_FALSE);
+    POPARGS();
+    return SCM_VOID;
 }
 
 void
@@ -142,9 +162,10 @@ builtin_CP_if(OBJ unevaluatedArgList, OBJ env) {
 		    PUSH(elsePart);
 		    PUSH(env);
 
+		    ASSERT_tag(env, T_ENVIRONMENT);
+
 		    // out args
-		    PUSH(unevaluatedCond);
-		    PUSH(env);
+		    PUSH(unevaluatedCond); PUSH(env);
 		    CALL(CP_eval, CP_if2);
 		    // not reached
 		}
@@ -163,6 +184,8 @@ CP_if2() {
     elsePart = POP();
     ifPart = POP();
 
+    ASSERT_tag(env, T_ENVIRONMENT);
+
     evaluatedCond = RETVAL;
 
     if (evaluatedCond == SCM_TRUE) {
@@ -170,8 +193,7 @@ CP_if2() {
     } else {
 	exprToEvaluate = elsePart;
     }
-    PUSH(exprToEvaluate);
-    PUSH(env);
+    PUSH(exprToEvaluate); PUSH(env);
     TCALL(CP_eval);
 }
 
@@ -221,8 +243,7 @@ builtin_CP_define(OBJ unevaluatedArgList, OBJ env) {
 		PUSH(name);
 		PUSH(env);
 
-		PUSH(expr);
-		PUSH(env);
+		PUSH(expr); PUSH(env);
 		CALL(CP_eval, CP_define2);
 		// not reached
 	    }
@@ -238,7 +259,7 @@ builtin_CP_define(OBJ unevaluatedArgList, OBJ env) {
 	    argList = cdr(nameOrFunctionTemplate);
 	    bodyList = cdr(unevaluatedArgList);
 	    func = new_userDefinedFunction(argList, bodyList, env);
-	    defineGlobalValue(env, functionName, func);
+	    defineOrSetValue(env, functionName, func, C_TRUE);
 	    RETURN( SCM_VOID );
 	}
     }
@@ -253,13 +274,55 @@ CP_define2() {
     env = POP();
     name = POP();
 
-    defineGlobalValue(env, name, evaluatedExpr);
+    ASSERT_tag(env, T_ENVIRONMENT);
+    ASSERT_tag(name, T_SYMBOL);
+
+    defineOrSetValue(env, name, evaluatedExpr, C_TRUE);
     RETURN( SCM_VOID );
 }
 
+static VOIDFUNCPTRFUNC CP_set2();
+
 VOIDFUNCPTRFUNC
-builtin_CP_set(OBJ unevaluatedArgList) {
-    fatal("unimpl.");
+builtin_CP_set(OBJ unevaluatedArgList, OBJ env) {
+    if (unevaluatedArgList != SCM_NIL) {
+	OBJ name = car(unevaluatedArgList);
+	OBJ restList = cdr(unevaluatedArgList);
+
+	if (restList != SCM_NIL) {
+	    OBJ expr = car(restList);
+	    restList = cdr(restList);
+
+	    if (restList == SCM_NIL) {
+		if (isSymbol(name)) {
+		    PUSH(name);
+		    PUSH(env);
+
+		    PUSH(expr); PUSH(env);
+		    CALL(CP_eval, CP_set2);
+		    // not reached
+		} else {
+		    error("[set!] name must be a symbol", NULL);
+		}
+	    }
+	}
+    }
+    argumentCountError("set!", 2, length(unevaluatedArgList), C_TRUE);
+}
+
+static VOIDFUNCPTRFUNC
+CP_set2() {
+    OBJ evaluatedExpr = RETVAL;
+    OBJ name, env;
+
+    env = POP();
+    name = POP();
+
+    ASSERT_tag(env, T_ENVIRONMENT);
+    ASSERT_tag(name, T_SYMBOL);
+
+    defineOrSetValue(env, name, evaluatedExpr, C_FALSE);
+    RETURN( SCM_VOID );
 }
 
 //
@@ -296,6 +359,7 @@ CP_load2() {
     char *fileName;
 
     env = POP();
+    ASSERT_tag(env, T_ENVIRONMENT);
 
     fileName = stringVal(evaluatedArg);
 
@@ -325,6 +389,23 @@ CP_load3() {
     RETURN ( SCM_VOID );
 }
 
+VOIDFUNCPTRFUNC
+builtin_CP_eval(OBJ unevaluatedArgList, OBJ env) {
+    if (unevaluatedArgList != SCM_NIL) {
+	OBJ unevaluatedExpr = car(unevaluatedArgList);
+	OBJ restList = cdr(unevaluatedArgList);
+
+	if (restList == SCM_NIL) {
+	    // args for eval
+	    PUSH(unevaluatedExpr); PUSH(globalEnvironment);
+	    TCALL(CP_eval);
+	    // not reached
+	}
+    }
+    argumentCountError("eval", 1, length(unevaluatedArgList), C_FALSE);
+}
+
+
 void
 initializeBuiltinSyntax() {
     defineBuiltinSyntax("if", (VOIDFUNCPTRFUNC)builtin_CP_if);
@@ -333,6 +414,7 @@ initializeBuiltinSyntax() {
     defineBuiltinSyntax("define", (VOIDFUNCPTRFUNC)builtin_CP_define);
     defineBuiltinSyntax("set!", (VOIDFUNCPTRFUNC)builtin_CP_set);
     defineBuiltinSyntax("load", (VOIDFUNCPTRFUNC)builtin_CP_load);
+    defineBuiltinSyntax("eval", (VOIDFUNCPTRFUNC)builtin_CP_eval);
 }
 
 #endif // not RECURSIVE

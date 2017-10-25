@@ -1,14 +1,21 @@
+//////////////////////////////////////////////////////////////////
+//
+// Copyright 2017 Claus Gittinger
+//
+// You may use this, but not claim to have written or own it!
+// Use at your own risk.
+//
+//////////////////////////////////////////////////////////////////
+
 #include "scheme.h"
 
-#define BE_SILENT
-
-static int silent = 1;
+#ifdef SELFTEST
 
 #ifndef RECURSIVE
 static void trampolineTest();
 #endif
 
-#ifdef SELFTEST
+static int silent = 1;
 
 void
 selftest() {
@@ -149,16 +156,16 @@ selftest() {
 	OBJ sym_b = new_symbol("b");
 	OBJ v1, v2;
 
-	ASSERT( getGlobalValue(env, sym_a) == NULL, "global a");
-	ASSERT( getGlobalValue(env, sym_b) == NULL, "global b");
+	ASSERT( getValue(env, sym_a) == NULL, "global a");
+	ASSERT( getValue(env, sym_b) == NULL, "global b");
 
-	defineGlobalValue(env, sym_a, new_integer(100));
-	v1 = getGlobalValue(env, sym_a);
+	defineOrSetValue(env, sym_a, new_integer(100), C_TRUE);
+	v1 = getValue(env, sym_a);
 	ASSERT( isInteger(v1), "oops a");
 	ASSERT( integerVal(v1) == 100, "oops a");
 
-	defineGlobalValue(env, sym_b, new_integer(200));
-	v2 = getGlobalValue(env, sym_b);
+	defineOrSetValue(env, sym_b, new_integer(200), C_TRUE);
+	v2 = getValue(env, sym_b);
 	ASSERT( isInteger(v2), "oops b");
 	ASSERT( integerVal(v2) == 200, "oops b");
     }
@@ -173,7 +180,7 @@ selftest() {
 
 	    snprintf(nameBuffer, sizeof(nameBuffer), "sym%d", count);
 	    name = new_symbol(nameBuffer);
-	    defineGlobalValue(env, name, new_integer(count));
+	    defineOrSetValue(env, name, new_integer(count), C_TRUE);
 	}
 
 	// the must all be present (none lost)
@@ -183,7 +190,7 @@ selftest() {
 
 	    snprintf(nameBuffer, sizeof(nameBuffer), "sym%d", count);
 	    name = new_symbol(nameBuffer);
-	    value = getGlobalValue(env, name);
+	    value = getValue(env, name);
 	    ASSERT( isInteger(value), "oops not the stored value");
 	    ASSERT( integerVal(value) == count, "oops not the stored value");
 	}
@@ -318,6 +325,60 @@ selftest() {
 
     rslt = scm_evalCString("(= (* -10 -10) 100)");
     ASSERT_true(rslt, "* result wrong");
+
+    // bytecode interpretation tests
+    //
+    {
+	OBJ add30fn, retVal;
+	//
+	// #define ADD     10
+	// #define SUB     11
+	// #define MUL     12
+	// #define DIV     13
+	//
+	// #define RET_TOP 20
+	//
+	// #define PUSH_CONSTANT 30
+	// #define PUSH_ARG      31
+	// #define PUSH_LOCAL    32
+
+	// (+ n 10 20))
+
+	// PUSH_ARG 0
+	// PUSH_CONST 0
+	// ADD
+	// PUSH_CONST 1
+	// ADD
+
+	// RET_TOP
+
+	// 31 0
+	// 30 0
+	// 10
+	// 30 1
+	// 10
+	// 20
+
+	scm_evalCString("(define (add30 n) (+ n 10 20))");
+	add30fn = scm_evalCString("add30");
+	scm_evalCString("(set-bytecode add30 '(31 0 30 0 10 30 1 10 20) '(10 20))");
+	ASSERT(add30fn->userDefinedFunction.bytecode != NULL, "bad bytecode");
+	ASSERT(add30fn->userDefinedFunction.constantTable != NULL, "bad bytecode");
+	ASSERT(add30fn->userDefinedFunction.bytecode[0] == 31, "bad bytecode");
+	ASSERT(add30fn->userDefinedFunction.bytecode[1] == 0, "bad bytecode");
+	ASSERT(add30fn->userDefinedFunction.bytecode[2] == 30, "bad bytecode");
+	ASSERT(add30fn->userDefinedFunction.bytecode[8] == 20, "bad bytecode");
+
+	ASSERT(isInteger( add30fn->userDefinedFunction.constantTable[0]) , "bad consts");
+	ASSERT(integerVal( add30fn->userDefinedFunction.constantTable[0]) == 10 , "bad consts");
+	ASSERT(isInteger( add30fn->userDefinedFunction.constantTable[1]) , "bad consts");
+	ASSERT(integerVal( add30fn->userDefinedFunction.constantTable[1]) == 20 , "bad consts");
+
+	retVal = scm_evalCString("(add30 100)");
+	ASSERT(isInteger(retVal), "bad result from add40");
+	ASSERT(integerVal(retVal) == 130, "bad result from add40");
+    }
+    printf("end of selftest\n");
 }
 
 # ifndef RECURSIVE

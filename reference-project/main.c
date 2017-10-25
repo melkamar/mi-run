@@ -1,3 +1,12 @@
+//////////////////////////////////////////////////////////////////
+//
+// Copyright 2017 Claus Gittinger
+//
+// You may use this, but not claim to have written or own it!
+// Use at your own risk.
+//
+//////////////////////////////////////////////////////////////////
+
 #include "scheme.h"
 #include <setjmp.h>
 
@@ -17,8 +26,8 @@ initializeWellknownObjects() {
     SCM_EOF = new_singleton(T_EOF);
     SCM_VOID = new_singleton(T_VOID);
 
-    defineGlobalValue(globalEnvironment, new_symbol("#t"), SCM_TRUE);
-    defineGlobalValue(globalEnvironment, new_symbol("#f"), SCM_FALSE);
+    defineOrSetValue(globalEnvironment, new_symbol("#t"), SCM_TRUE, C_TRUE);
+    defineOrSetValue(globalEnvironment, new_symbol("#f"), SCM_FALSE, C_TRUE);
 }
 
 int
@@ -51,7 +60,7 @@ main(int argc, char **argv) {
 	fclose(initFile);
     }
 
-    printf("Welcome to this very incomplete scheme implementation\n");
+    printf("Welcome to this better scheme implementation\n");
 
     if (setjmp(getMeBackToMain) != 0) {
 	printf("back in REPL after error\n");

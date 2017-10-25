@@ -1,3 +1,12 @@
+//////////////////////////////////////////////////////////////////
+//
+// Copyright 2017 Claus Gittinger
+//
+// You may use this, but not claim to have written or own it!
+// Use at your own risk.
+//
+//////////////////////////////////////////////////////////////////
+
 #include "scheme.h"
 #include <string.h>
 #include <errno.h>
@@ -132,6 +141,9 @@ scm_readList(OBJ inStream) {
 
     skipWhitespace(inStream);
     ch = scm_peekCharacter(inStream);
+    if (ch == STREAM_EOF) {
+	error("unterminated list:", NULL);
+    }
     if (ch == ')') {
 	scm_advanceReadPointer(inStream);
 	return SCM_NIL;
@@ -140,6 +152,9 @@ scm_readList(OBJ inStream) {
 
     skipWhitespace(inStream);
     ch = scm_peekCharacter(inStream);
+    if (ch == STREAM_EOF) {
+	error("unterminated list:", NULL);
+    }
     if (ch == '.') {
 	OBJ cdrExpr;
 
@@ -148,6 +163,9 @@ scm_readList(OBJ inStream) {
 
 	skipWhitespace(inStream);
 	ch = scm_peekCharacter(inStream);
+	if (ch == STREAM_EOF) {
+	    error("unterminated list:", NULL);
+	}
 	if (ch != ')') {
 	    error("bad list (expected ')')", NULL);
 	}

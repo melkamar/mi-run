@@ -377,6 +377,17 @@ builtin_load(int indexOfFirstArg) {
     return SCM_VOID;
 }
 
+OBJ
+builtin_eval(int indexOfFirstArg) {
+    OBJ expr;
+
+    checkNumberOfArguments("eval", 1);
+
+    expr = ARG(0);
+    POPARGS();
+    return scm_eval(expr, globalEnvironment);
+}
+
 #endif
 
 ///////////////////////////////////////////////
@@ -388,43 +399,162 @@ builtin_load(int indexOfFirstArg) {
 //
 OBJ
 builtin_numberP(int indexOfFirstArg) {
+    OBJ arg;
+
     checkNumberOfArguments("number?", 1);
 
-    return isNumber(ARG(0)) ? SCM_TRUE : SCM_FALSE;
+    arg = ARG(0);
+    POPARGS();
+    return isNumber(arg) ? SCM_TRUE : SCM_FALSE;
 }
 
 OBJ
 builtin_integerP(int indexOfFirstArg) {
+    OBJ arg;
+
     checkNumberOfArguments("integer?", 1);
 
-    return isInteger(ARG(0)) ? SCM_TRUE : SCM_FALSE;
+    arg = ARG(0);
+    POPARGS();
+    return isInteger(arg) ? SCM_TRUE : SCM_FALSE;
 }
 
 OBJ
 builtin_floatP(int indexOfFirstArg) {
-    fatal("unimpl.");
+    OBJ arg;
+
+    checkNumberOfArguments("float?", 1);
+
+    arg = ARG(0);
+    POPARGS();
+    return isFloat(arg) ? SCM_TRUE : SCM_FALSE;
 }
 
 OBJ
 builtin_stringP(int indexOfFirstArg) {
+    OBJ arg;
+
     checkNumberOfArguments("string?", 1);
 
-    return isString(ARG(0)) ? SCM_TRUE : SCM_FALSE;
+    arg = ARG(0);
+    POPARGS();
+    return isString(arg) ? SCM_TRUE : SCM_FALSE;
 }
 
 OBJ
 builtin_symbolP(int indexOfFirstArg) {
-    checkNumberOfArguments("symbol?", 1);
+    OBJ arg;
 
-    return isSymbol(ARG(0)) ? SCM_TRUE : SCM_FALSE;
+    checkNumberOfArguments("symbol?", 1);
+    arg = ARG(0);
+    POPARGS();
+
+    return isSymbol(arg) ? SCM_TRUE : SCM_FALSE;
 }
 
 OBJ
 builtin_consP(int indexOfFirstArg) {
+    OBJ arg;
+
     checkNumberOfArguments("cons?", 1);
 
-    return isCons(ARG(0)) ? SCM_TRUE : SCM_FALSE;
+    arg = ARG(0);
+    POPARGS();
+    return isCons(arg) ? SCM_TRUE : SCM_FALSE;
 }
+
+///////////////////////////////////////////////
+// compiler support functions
+///////////////////////////////////////////////
+
+// (set-bytecode fn bytecode constantTable) -> void
+//
+static unsigned char*
+convert_scheme_list_to_charArray(OBJ l) {
+    int len = length(l);
+    unsigned char* bytes = (unsigned char*)malloc(len);
+    int idx = 0;
+
+    while (l != SCM_NIL) {
+	OBJ element = car(l);
+
+	l = cdr(l);
+	if (! isInteger(element)) {
+	    error("bad bytecode element:", element);
+	}
+	bytes[idx++] = integerVal(element);
+    }
+    return bytes;
+}
+
+static OBJ*
+convert_scheme_list_to_objArray(OBJ l) {
+    int len = length(l);
+    OBJ* constTable = (OBJ*)malloc(len * sizeof(OBJ));
+    int idx = 0;
+
+    while (l != SCM_NIL) {
+	OBJ element = car(l);
+
+	l = cdr(l);
+	constTable[idx++] = element;
+    }
+    return constTable;
+}
+
+OBJ
+builtin_setBytecode(int indexOfFirstArg) {
+    OBJ fn, bc, consts;
+
+    checkNumberOfArguments("set-bytecode", 3);
+
+    fn = ARG(0);
+    bc = ARG(1);
+    consts = ARG(2);
+    POPARGS();
+    if (! isUserDefinedFunction(fn)) {
+	error("[set-bytecode] argument is not a function:", fn);
+    }
+    if (! isCons(bc)) {
+	error("[set-bytecode] argument is not a cons:", bc);
+    }
+    if ((! isCons(consts)) && ! (consts == SCM_NIL)) {
+	error("[set-bytecode] argument is not a cons:", consts);
+    }
+    fn->userDefinedFunction.bytecode = convert_scheme_list_to_charArray(bc);
+    fn->userDefinedFunction.constantTable = convert_scheme_list_to_objArray(consts);
+    fn->any.tag = T_BYTECODEFUNCTION;
+    return SCM_VOID;
+}
+
+OBJ
+builtin_getFunctionBody(int indexOfFirstArg) {
+    OBJ fn;
+
+    checkNumberOfArguments("get-function-body", 1);
+
+    fn = ARG(0);
+    POPARGS();
+    if (! isUserDefinedFunction(fn)) {
+	error("[get-function-body] argument is not a function:", fn);
+    }
+    return fn->userDefinedFunction.bodyList;
+}
+
+OBJ
+builtin_getFunctionArgList(int indexOfFirstArg) {
+    OBJ fn;
+
+    checkNumberOfArguments("get-function-args", 1);
+
+    fn = ARG(0);
+    POPARGS();
+    if (! isUserDefinedFunction(fn)) {
+	error("[get-function-args] argument is not a function:", fn);
+    }
+    return fn->userDefinedFunction.argList;
+}
+
 
 void
 initializeBuiltinFunctions() {
@@ -466,5 +596,9 @@ initializeBuiltinFunctions() {
     defineBuiltinFunction("print", builtin_print);
 #ifdef RECURSIVE
     defineBuiltinFunction("load", builtin_load);
+    defineBuiltinFunction("eval", builtin_eval);
 #endif
+    defineBuiltinFunction("set-bytecode", builtin_setBytecode);
+    defineBuiltinFunction("get-function-body", builtin_getFunctionBody);
+    defineBuiltinFunction("get-function-args", builtin_getFunctionArgList);
 }

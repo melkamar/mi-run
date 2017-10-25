@@ -1,3 +1,12 @@
+//////////////////////////////////////////////////////////////////
+//
+// Copyright 2017 Claus Gittinger
+//
+// You may use this, but not claim to have written or own it!
+// Use at your own risk.
+//
+//////////////////////////////////////////////////////////////////
+
 #include "scheme.h"
 #include <string.h>
 
@@ -101,6 +110,8 @@ new_userDefinedFunction(OBJ argList, OBJ bodyList, OBJ homeEnv) {
     newObj->userDefinedFunction.argList = argList;
     newObj->userDefinedFunction.bodyList = bodyList;
     newObj->userDefinedFunction.homeEnvironment = homeEnv;
+    newObj->userDefinedFunction.bytecode = NULL;
+    newObj->userDefinedFunction.constantTable = NULL;
     return newObj;
 }
 
@@ -162,15 +173,15 @@ new_cons(OBJ car, OBJ cdr) {
 }
 
 OBJ
-new_globalEnvironment(int size) {
+new_environment(int size) {
     OBJ newObj;
 
-    newObj = (OBJ)malloc(sizeof(struct schemeGlobalEnvironment));
-    newObj->globalEnvironment.tag = T_GLOBALENVIRONMENT;
-    newObj->globalEnvironment.entries = (envEntry *)malloc(sizeof(envEntry) * size);
-    memset(newObj->globalEnvironment.entries, 0, (sizeof(envEntry) * size));
-    newObj->globalEnvironment.size = size;
-    newObj->globalEnvironment.fillCount = 0;
-    newObj->globalEnvironment.parentEnvironment = NULL;
+    newObj = (OBJ)malloc(sizeof(struct schemeEnvironment));
+    newObj->environment.tag = T_ENVIRONMENT;
+    newObj->environment.entries = (envEntry *)malloc(sizeof(envEntry) * size);
+    memset(newObj->environment.entries, 0, (sizeof(envEntry) * size));
+    newObj->environment.size = size;
+    newObj->environment.fillCount = 0;
+    newObj->environment.parentEnvironment = NULL;
     return newObj;
 }

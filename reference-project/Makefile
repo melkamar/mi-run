@@ -2,7 +2,7 @@
 #
 OBJS=main.o reader.o eval.o print.o utils.o selftest.o \
      memory.o symbols.o environment.o builtinFunctions.o \
-     builtinSyntax.o
+     builtinSyntax.o bytecodeInterpreter.o
 
 HEADERS=scheme.h functionPrototypes.h assertions.h parameters.h
 CFLAGS=-g

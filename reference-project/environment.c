@@ -26,19 +26,19 @@ OBJ globalEnvironment = NULL;
 
 void
 initializeGlobalEnvironment() {
-    globalEnvironment = new_globalEnvironment(INITIAL_GLOBALENVIRONMENT_SIZE);
+    globalEnvironment = new_environment(INITIAL_GLOBALENVIRONMENT_SIZE);
 }
 
 static void
-growGlobalEnvironment(OBJ env) {
-    envEntry *oldEntries = env->globalEnvironment.entries;
-    int oldSize = env->globalEnvironment.size;
+growEnvironment(OBJ env) {
+    envEntry *oldEntries = env->environment.entries;
+    int oldSize = env->environment.size;
     int idx, newSize;
 
-    env->globalEnvironment.size = newSize = nextPrimeAfter(oldSize * 2);
+    env->environment.size = newSize = nextPrimeAfter(oldSize * 2);
 
-    env->globalEnvironment.entries = (envEntry *)malloc(sizeof(envEntry) * newSize);
-    memset(env->globalEnvironment.entries, 0, (sizeof(envEntry) * newSize));
+    env->environment.entries = (envEntry *)malloc(sizeof(envEntry) * newSize);
+    memset(env->environment.entries, 0, (sizeof(envEntry) * newSize));
 
     for (idx = 0; idx < oldSize; idx++) {
 	OBJ entriesKey = oldEntries[idx].key;
@@ -46,7 +46,7 @@ growGlobalEnvironment(OBJ env) {
 	if (entriesKey != NULL) {
 	    OBJ entriesValue = oldEntries[idx].value;
 
-	    defineGlobalValue(env, entriesKey, entriesValue);
+	    defineOrSetValue(env, entriesKey, entriesValue, C_TRUE);
 	}
     }
 }
@@ -57,30 +57,77 @@ H(OBJ o) {
 }
 
 OBJ
-getGlobalValue(OBJ env, OBJ symbol) {
+getValue(OBJ env, OBJ symbol) {
     for (;;) {
 	unsigned int hashKey = H(symbol);
-	unsigned int initialIndex = hashKey % env->globalEnvironment.size;
+	unsigned int initialIndex = hashKey % env->environment.size;
 	unsigned int searchIndex;
 	envEntry *probePtr;
 
 	searchIndex = initialIndex;
 
 	for (;;) {
-	    probePtr = &(env->globalEnvironment.entries[ searchIndex ]);
+	    probePtr = &(env->environment.entries[ searchIndex ]);
 	    if (probePtr->key == symbol) {
 		return probePtr->value;
 	    }
 	    if (probePtr->key == NULL) {
 		OBJ parent;
 
-		if ((parent = env->globalEnvironment.parentEnvironment) == NULL) {
+		if ((parent = env->environment.parentEnvironment) == NULL) {
 		    return NULL;
 		}
 		env = parent;
 		break;
 	    }
-	    searchIndex = (searchIndex + 1) % env->globalEnvironment.size;
+	    searchIndex = (searchIndex + 1) % env->environment.size;
+	    if (searchIndex == initialIndex) {
+		fatal("oops something fishy");
+	    }
+	}
+    }
+}
+
+//
+// common function for define and set!
+//
+void
+defineOrSetValue(OBJ env, OBJ symbol, OBJ newValue, bool defineIfUndefined) {
+again:
+    {
+	unsigned int hashKey = H(symbol);
+	unsigned int initialIndex = hashKey % env->environment.size;
+	unsigned int searchIndex;
+	envEntry *probePtr;
+
+	searchIndex = initialIndex;
+
+	for (;;) {
+	    probePtr = &(env->environment.entries[ searchIndex ]);
+	    if (probePtr->key == symbol) {
+		// redefining
+		probePtr->value = newValue;
+		return;
+	    }
+	    if (probePtr->key == NULL) {
+		if (! defineIfUndefined) {
+		    if (env->environment.parentEnvironment == NULL) {
+			error("[set!]: undefined:", symbol);
+		    }
+		    env = env->environment.parentEnvironment;
+		    goto again;
+		}
+
+		// found a free slot
+		probePtr->key = symbol;
+		probePtr->value = newValue;
+		env->environment.fillCount++;
+		if (env->environment.fillCount > (env->environment.size * 3 / 4)) {
+		    growEnvironment(env);
+		}
+		return;
+	    }
+	    searchIndex = (searchIndex + 1) % env->environment.size;
 	    if (searchIndex == initialIndex) {
 		fatal("oops something fishy");
 	    }
@@ -89,42 +136,9 @@ getGlobalValue(OBJ env, OBJ symbol) {
 }
 
 void
-defineGlobalValue(OBJ env, OBJ symbol, OBJ newValue) {
-    unsigned int hashKey = H(symbol);
-    unsigned int initialIndex = hashKey % env->globalEnvironment.size;
-    unsigned int searchIndex;
-    envEntry *probePtr;
-
-    searchIndex = initialIndex;
-
-    for (;;) {
-	probePtr = &(env->globalEnvironment.entries[ searchIndex ]);
-	if (probePtr->key == symbol) {
-	    // redefining
-	    probePtr->value = newValue;
-	    return;
-	}
-	if (probePtr->key == NULL) {
-	    // found a free slot
-	    probePtr->key = symbol;
-	    probePtr->value = newValue;
-	    env->globalEnvironment.fillCount++;
-	    if (env->globalEnvironment.fillCount > (env->globalEnvironment.size * 3 / 4)) {
-		growGlobalEnvironment(env);
-	    }
-	    return;
-	}
-	searchIndex = (searchIndex + 1) % env->globalEnvironment.size;
-	if (searchIndex == initialIndex) {
-	    fatal("oops something fishy");
-	}
-    }
-}
-
-void
 defineBuiltinFunction(char* name, OBJFUNC code) {
     OBJ func = new_builtinFunction(code, name);
-    defineGlobalValue(globalEnvironment, new_symbol(name), func);
+    defineOrSetValue(globalEnvironment, new_symbol(name), func, C_TRUE);
 }
 
 void
@@ -135,5 +149,5 @@ defineBuiltinSyntax(char* name, VOIDFUNCPTRFUNC code)
 #endif
 {
     OBJ func = new_builtinSyntax(code, name);
-    defineGlobalValue(globalEnvironment, new_symbol(name), func);
+    defineOrSetValue(globalEnvironment, new_symbol(name), func, C_TRUE);
 }

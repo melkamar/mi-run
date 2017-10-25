@@ -1,7 +1,22 @@
+//////////////////////////////////////////////////////////////////
+//
+// Copyright 2017 Claus Gittinger
+//
+// You may use this, but not claim to have written or own it!
+// Use at your own risk.
+//
+//////////////////////////////////////////////////////////////////
+
 #include "scheme.h"
 
 static int trace = 0;
 static int traceLevel = 0;
+
+#ifdef STATISTICS
+static int count_eval_symbol = 0;
+static int count_eval_cons = 0;
+static int count_eval_constant = 0;
+#endif
 
 static void
 spaces(n) {
@@ -54,8 +69,7 @@ CP_readEvalPrintLoop() {
     PUSH(inStream);
     PUSH(doPrompt);
 
-    PUSH(expr);
-    PUSH(globalEnvironment);
+    PUSH(expr); PUSH(globalEnvironment);
     CALL(CP_eval, CP_readEvalPrintLoop_1);
     // never reached
 }
@@ -89,7 +103,7 @@ CP_readEvalPrintLoop_1() {
 
 static OBJ
 scm_evalSymbol(OBJ expr, OBJ env) {
-    OBJ valOrNULL = getGlobalValue(env, expr);
+    OBJ valOrNULL = getValue(env, expr);
 
     if (valOrNULL == NULL) {
 	error("undefined:", expr);
@@ -104,6 +118,7 @@ scm_evalList(OBJ expr, OBJ env) {
 
     switch (tagOf(evaluatedFunction)) {
 	case T_BUILTINFUNCTION:
+	case T_BYTECODEFUNCTION:
 	    {
 		OBJ unevaluatedArgList = cdr(expr);
 		int indexOfFirstArg = SP;
@@ -129,7 +144,11 @@ scm_evalList(OBJ expr, OBJ env) {
 		}
 
 		// call the code of the builtin with eval'd args on the stack
-		retVal = evaluatedFunction->builtinFunction.code(indexOfFirstArg);
+		if (tagOf(evaluatedFunction) == T_BYTECODEFUNCTION) {
+		    retVal = evalBytecode(evaluatedFunction, indexOfFirstArg);
+		} else {
+		    retVal = evaluatedFunction->builtinFunction.code(indexOfFirstArg);
+		}
 		return retVal;
 	    }
 
@@ -164,10 +183,10 @@ scm_evalList(OBJ expr, OBJ env) {
 		OBJ bodyList = evaluatedFunction->userDefinedFunction.bodyList;
 		OBJ functionsHome = evaluatedFunction->userDefinedFunction.homeEnvironment;
 		OBJ unevaluatedArgList = cdr(expr);
-		OBJ newEnv = new_globalEnvironment(7);
+		OBJ newEnv = new_environment(INITIAL_LOCALENVIRONMENT_SIZE);
 		OBJ lastResult;
 
-		newEnv->globalEnvironment.parentEnvironment = functionsHome;
+		newEnv->environment.parentEnvironment = functionsHome;
 
 		if (trace) {
 		    spaces(traceLevel);
@@ -182,11 +201,12 @@ scm_evalList(OBJ expr, OBJ env) {
 		    // printf("arg is: "); scm_print(argName, stdout); printf("\n");
 		    // printf("value is: "); scm_print(evaluatedArg, stdout); printf("\n");
 
-		    defineGlobalValue(newEnv, argName, evaluatedArg);
+		    defineOrSetValue(newEnv, argName, evaluatedArg, C_TRUE);
 
 		    unevaluatedArgList = cdr(unevaluatedArgList);
 		    formalArgs = cdr(formalArgs);
 		}
+		lastResult = SCM_VOID;
 		while (bodyList != SCM_NIL) {
 		    lastResult = scm_eval(car(bodyList), newEnv);
 		    bodyList = cdr(bodyList);
@@ -211,14 +231,25 @@ scm_eval(OBJ expr, OBJ env) {
     switch (tagOf(expr)) {
 	case T_SYMBOL:
 	    result = scm_evalSymbol(expr, env);
+#ifdef STATISTICS
+	    count_eval_symbol++;
+#endif
 	    break;
+
 	case T_CONS:
 	    traceLevel++;
 	    result = scm_evalList(expr, env);
 	    traceLevel--;
+#ifdef STATISTICS
+	    count_eval_cons++;
+#endif
 	    break;
+
 	default:
 	    result = expr;
+#ifdef STATISTICS
+	    count_eval_constant++;
+#endif
 	    break;
     }
 
@@ -242,6 +273,8 @@ CP_evalList() {
     env = POP();
     expr = POP();
 
+    ASSERT_tag(env, T_ENVIRONMENT);
+
     {
 	OBJ unevaluatedFunction = car(expr);
 
@@ -250,8 +283,7 @@ CP_evalList() {
 	PUSH(env);
 
 	// out arguments
-	PUSH(unevaluatedFunction);
-	PUSH(env);
+	PUSH(unevaluatedFunction); PUSH(env);
 	CALL(CP_eval, CP_evalList_1);
 	// not reached
     }
@@ -272,8 +304,11 @@ CP_evalList_1() {
     env = POP();
     expr = POP();
 
+    ASSERT_tag(env, T_ENVIRONMENT);
+
     switch (tagOf(evaluatedFunction)) {
 	case T_BUILTINFUNCTION:
+	case T_BYTECODEFUNCTION:
 	    {
 		OBJ unevaluatedArgList = cdr(expr);
 		int indexOfFirstArg = SP;
@@ -294,14 +329,17 @@ CP_evalList_1() {
 		    PUSH(env);
 
 		    // out args
-		    PUSH(unevaluatedArg);
-		    PUSH(env);
+		    PUSH(unevaluatedArg); PUSH(env);
 		    CALL(CP_eval, CP_evalList_2);
 		    // not reached
 		}
 
 		// call the code of the builtin with eval'd args on the stack
-		retVal = evaluatedFunction->builtinFunction.code(indexOfFirstArg);
+		if (tagOf(evaluatedFunction) == T_BYTECODEFUNCTION) {
+		    retVal = evalBytecode(evaluatedFunction, indexOfFirstArg);
+		} else {
+		    retVal = evaluatedFunction->builtinFunction.code(indexOfFirstArg);
+		}
 		RETURN( retVal );
 	    }
 
@@ -321,9 +359,9 @@ CP_evalList_1() {
 		OBJ bodyList = evaluatedFunction->userDefinedFunction.bodyList;
 		OBJ functionsHome = evaluatedFunction->userDefinedFunction.homeEnvironment;
 		OBJ unevaluatedArgList = cdr(expr);
-		OBJ newEnv = new_globalEnvironment(7);
+		OBJ newEnv = new_environment(INITIAL_LOCALENVIRONMENT_SIZE);
 
-		newEnv->globalEnvironment.parentEnvironment = functionsHome;
+		newEnv->environment.parentEnvironment = functionsHome;
 
 		if (trace) {
 		    spaces(traceLevel);
@@ -341,8 +379,7 @@ CP_evalList_1() {
 		    PUSH(argName);
 		    PUSH(env);
 
-		    PUSH(unevaluatedArg);
-		    PUSH(env);
+		    PUSH(unevaluatedArg); PUSH(env);
 		    CALL(CP_eval, CP_evalUDF_1);
 		    // not reached
 		}
@@ -383,7 +420,11 @@ CP_evalUDF_1() {
     formalArgs = POP();
     bodyList = POP();
 
-    defineGlobalValue(newEnv, argName, evaluatedArg);
+    ASSERT_tag(env, T_ENVIRONMENT);
+    ASSERT_tag(argName, T_SYMBOL);
+    ASSERT_tag(newEnv, T_ENVIRONMENT);
+
+    defineOrSetValue(newEnv, argName, evaluatedArg, C_TRUE);
 
     unevaluatedArgList = cdr(unevaluatedArgList);
     formalArgs = cdr(formalArgs);
@@ -431,6 +472,8 @@ CP_evalUDF_2() {
     newEnv = POP();
     bodyList = POP();
 
+    ASSERT_tag(newEnv, T_ENVIRONMENT);
+
     nextExpr = car(bodyList);
     bodyList = cdr(bodyList);
     if (bodyList == SCM_NIL) {
@@ -462,6 +505,8 @@ CP_evalList_2() {
     evaluatedFunction = POP();
     indexOfFirstArg = POP_INT();
 
+    ASSERT_tag(env, T_ENVIRONMENT);
+
     PUSH(evaluatedArg);
     unevaluatedArgList = cdr(unevaluatedArgList);
 
@@ -481,7 +526,11 @@ CP_evalList_2() {
     }
 
     // call the code of the builtin with eval'd args on the stack
-    retVal = evaluatedFunction->builtinFunction.code(indexOfFirstArg);
+    if (tagOf(evaluatedFunction) == T_BYTECODEFUNCTION) {
+	retVal = evalBytecode(evaluatedFunction, indexOfFirstArg);
+    } else {
+	retVal = evaluatedFunction->builtinFunction.code(indexOfFirstArg);
+    }
     RETURN (retVal);
 }
 
@@ -493,6 +542,8 @@ CP_eval() {
     env = POP();
     expr = POP();
 
+    ASSERT_tag(env, T_ENVIRONMENT);
+
     if (trace) {
 	spaces(traceLevel);
 	printf("eval: "); scm_print(expr, stdout); printf("\n");
@@ -501,7 +552,7 @@ CP_eval() {
     switch (tagOf(expr)) {
 	case T_SYMBOL:
 	    {
-		OBJ valOrNULL = getGlobalValue(env, expr);
+		OBJ valOrNULL = getValue(env, expr);
 
 		if (valOrNULL == NULL) {
 		    error("undefined:", expr);

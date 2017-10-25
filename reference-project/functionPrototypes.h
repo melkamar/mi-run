@@ -1,3 +1,14 @@
+//////////////////////////////////////////////////////////////////
+//
+// Copyright 2017 Claus Gittinger
+//
+// You may use this, but not claim to have written or own it!
+// Use at your own risk.
+//
+//////////////////////////////////////////////////////////////////
+
+OBJ evalBytecode(OBJ theFunction, int indexOfFirstArg);
+
 OBJ scm_read(OBJ inStream);
 void scm_printOrDisplay(OBJ expr, FILE* outStream, bool);
 #define scm_print(expr, outStream)   scm_printOrDisplay(expr, outStream, C_FALSE)
@@ -28,7 +39,7 @@ OBJ new_builtinSyntax(OBJFUNC func, char* name);
 OBJ new_builtinSyntax(VOIDFUNCPTRFUNC func, char* name);
 #endif
 OBJ new_userDefinedFunction(OBJ argList, OBJ bodyList, OBJ homeEnv);
-OBJ new_globalEnvironment(int size);
+OBJ new_environment(int size);
 
 void growStack();
 void growReturnStack();
@@ -53,8 +64,8 @@ void initializeReturnStack();
 void initializeBuiltinFunctions();
 void initializeBuiltinSyntax();
 
-OBJ getGlobalValue(OBJ env, OBJ symbol);
-void defineGlobalValue(OBJ env, OBJ symbol, OBJ newValue);
+OBJ getValue(OBJ env, OBJ symbol);
+void defineOrSetValue(OBJ env, OBJ symbol, OBJ newValue, bool);
 
 void defineBuiltinFunction(char* name, OBJFUNC code);
 #ifdef RECURSIVE
@@ -64,3 +75,8 @@ void defineBuiltinSyntax(char* name, VOIDFUNCPTRFUNC code);
 #endif
 
 void selftest();
+
+OBJ builtin_plus(int);
+OBJ builtin_minus(int);
+OBJ builtin_times(int);
+OBJ builtin_cons(int);
