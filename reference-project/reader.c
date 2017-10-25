@@ -30,7 +30,7 @@ scm_readOrPeekCharacter(OBJ inStream, bool doRead) {
 		    retChar = getc(f);
 		} while ((retChar == -1)
 			 // -- this should , but does not work on OSX
-			 // && (ferror(f) /* errno */ == EINTR)
+			 // && (ferror(f) == EINTR)
 			 && (errno == EINTR));
 
 		if (!doRead) {
@@ -161,8 +161,8 @@ scm_readList(OBJ inStream) {
 
 typedef struct bufferStruct {
     char *memory;
-    int bufferSize;
-    int fillCount;
+    size_t bufferSize;
+    size_t fillCount;
     char quickMemory[128];
 } buffer;
 
@@ -185,7 +185,7 @@ freeBuffer(buffer *b) {
 
 static inline void
 growBuffer(buffer *b) {
-    int newSize = b->bufferSize * 2;
+    size_t newSize = b->bufferSize * 2;
 
     if (b->memory == b->quickMemory) {
 	b->memory = malloc((size_t)newSize);
@@ -229,6 +229,7 @@ static OBJ
 scm_readAtom(OBJ inStream) {
     buffer b;
 
+    b.memory = NULL;
     allocBuffer(&b);
     for (;;) {
 	int ch = scm_peekCharacter(inStream);
@@ -267,6 +268,7 @@ static OBJ
 scm_readString(OBJ inStream) {
     buffer b;
 
+    b.memory = NULL;
     allocBuffer(&b);
     for (;;) {
 	int ch = scm_readCharacter(inStream);
@@ -282,9 +284,6 @@ scm_readString(OBJ inStream) {
 		    break;
 		case 'r':
 		    ch = '\r';
-		    break;
-		case '"':
-		    ch = '"';
 		    break;
 		default:
 		    break;

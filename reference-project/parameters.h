@@ -1,3 +1,5 @@
+// #define RECURSIVE
+
 #define DEBUGGING
 #define SELFTEST
 

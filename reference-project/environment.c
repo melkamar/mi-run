@@ -128,7 +128,12 @@ defineBuiltinFunction(char* name, OBJFUNC code) {
 }
 
 void
-defineBuiltinSyntax(char* name, OBJFUNC code) {
+#ifdef RECURSIVE
+defineBuiltinSyntax(char* name, OBJFUNC code)
+#else
+defineBuiltinSyntax(char* name, VOIDFUNCPTRFUNC code)
+#endif
+{
     OBJ func = new_builtinSyntax(code, name);
     defineGlobalValue(globalEnvironment, new_symbol(name), func);
 }

@@ -4,7 +4,7 @@
 OBJ *stack = NULL;
 int SP = 0, currentStackSize = 0;
 
-VOIDPTRFUNC *returnStack = NULL;
+VOIDFUNCPTRFUNC *returnStack = NULL;
 int RSP = 0, currentReturnStackSize = 0;
 
 void
@@ -22,7 +22,7 @@ growStack() {
 
 void
 initializeReturnStack() {
-    returnStack = (VOIDPTRFUNC *)malloc(sizeof(VOIDPTRFUNC) * INITIAL_STACK_SIZE);
+    returnStack = (VOIDFUNCPTRFUNC *)malloc(sizeof(VOIDFUNCPTRFUNC) * INITIAL_STACK_SIZE);
     currentReturnStackSize = INITIAL_STACK_SIZE;
     RSP = 0;
 }
@@ -30,7 +30,7 @@ initializeReturnStack() {
 void
 growReturnStack() {
     currentReturnStackSize = currentReturnStackSize * 2;
-    returnStack = (VOIDPTRFUNC*)realloc(returnStack, sizeof(VOIDPTRFUNC) * currentReturnStackSize);
+    returnStack = (VOIDFUNCPTRFUNC *) realloc((void*)returnStack, sizeof(VOIDFUNCPTRFUNC) * currentReturnStackSize);
 }
 
 OBJ
@@ -77,7 +77,12 @@ new_builtinFunction(OBJFUNC func, char* name) {
 }
 
 OBJ
-new_builtinSyntax(OBJFUNC func, char* name) {
+#ifdef RECURSIVE
+new_builtinSyntax(OBJFUNC func, char* name)
+#else
+new_builtinSyntax(VOIDFUNCPTRFUNC func, char* name)
+#endif
+{
     OBJ newObj;
 
     newObj = (OBJ)malloc(sizeof(struct schemeBuiltinSyntax));

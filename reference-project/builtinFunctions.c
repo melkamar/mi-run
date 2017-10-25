@@ -20,7 +20,8 @@
 // Stack grows upward, so the stack looks like:
 // The nth argument can be accessed via the ARG(n) macro.
 // The number of arguments is given by the NUMARGS() macro.
-//
+// The return value is the return value of the C-function is.
+
 // ^                      ^
 // +----------------------+
 // +                      +  <--- SP (next free slot)
@@ -36,7 +37,7 @@
 //
 
 OBJ
-scm_plus(int indexOfFirstArg) {
+builtin_plus(int indexOfFirstArg) {
     int argIndex = indexOfFirstArg;
     long sum = 0;
 
@@ -58,7 +59,7 @@ scm_plus(int indexOfFirstArg) {
 }
 
 OBJ
-scm_minus(int indexOfFirstArg) {
+builtin_minus(int indexOfFirstArg) {
     long difference;
     OBJ firstArg;
 
@@ -91,7 +92,7 @@ scm_minus(int indexOfFirstArg) {
 }
 
 OBJ
-scm_times(int indexOfFirstArg) {
+builtin_times(int indexOfFirstArg) {
     int argIndex = indexOfFirstArg;
     long product = 1;
 
@@ -113,22 +114,22 @@ scm_times(int indexOfFirstArg) {
 }
 
 OBJ
-scm_quotient(int indexOfFirstArg) {
+builtin_quotient(int indexOfFirstArg) {
     fatal("unimpl.");
 }
 
 OBJ
-scm_bitwise_and(int indexOfFirstArg) {
+builtin_bitwise_and(int indexOfFirstArg) {
     fatal("unimpl.");
 }
 
 OBJ
-scm_bitwise_or(int indexOfFirstArg) {
+builtin_bitwise_or(int indexOfFirstArg) {
     fatal("unimpl.");
 }
 
 OBJ
-scm_bitwise_xor(int indexOfFirstArg) {
+builtin_bitwise_xor(int indexOfFirstArg) {
     fatal("unimpl.");
 }
 
@@ -137,7 +138,7 @@ scm_bitwise_xor(int indexOfFirstArg) {
 ///////////////////////////////////////////////
 
 OBJ
-scm_eqNr(int indexOfFirstArg) {
+builtin_eqNr(int indexOfFirstArg) {
     OBJ firstArg, secondArg;
 
     checkNumberOfArguments("=", 2);
@@ -155,7 +156,7 @@ scm_eqNr(int indexOfFirstArg) {
 }
 
 OBJ
-scm_lessNr(int indexOfFirstArg) {
+builtin_lessNr(int indexOfFirstArg) {
     OBJ firstArg, secondArg;
 
     checkNumberOfArguments("<", 2);
@@ -173,22 +174,22 @@ scm_lessNr(int indexOfFirstArg) {
 }
 
 OBJ
-scm_lessEqualNr(int indexOfFirstArg) {
+builtin_lessEqualNr(int indexOfFirstArg) {
     fatal("unimpl.");
 }
 
 OBJ
-scm_greaterNr(int indexOfFirstArg) {
+builtin_greaterNr(int indexOfFirstArg) {
     fatal("unimpl.");
 }
 
 OBJ
-scm_greaterEqualNr(int indexOfFirstArg) {
+builtin_greaterEqualNr(int indexOfFirstArg) {
     fatal("unimpl.");
 }
 
 OBJ
-scm_eq(int indexOfFirstArg) {
+builtin_eq(int indexOfFirstArg) {
     OBJ firstArg, secondArg;
 
     checkNumberOfArguments("eq?", 2);
@@ -204,7 +205,7 @@ scm_eq(int indexOfFirstArg) {
 ///////////////////////////////////////////////
 
 OBJ
-scm_cons(int indexOfFirstArg) {
+builtin_cons(int indexOfFirstArg) {
     OBJ firstArg, secondArg;
 
     checkNumberOfArguments("cons", 2);
@@ -216,7 +217,7 @@ scm_cons(int indexOfFirstArg) {
 }
 
 OBJ
-scm_car(int indexOfFirstArg) {
+builtin_car(int indexOfFirstArg) {
     OBJ arg;
 
     checkNumberOfArguments("car", 1);
@@ -230,7 +231,7 @@ scm_car(int indexOfFirstArg) {
 }
 
 OBJ
-scm_cdr(int indexOfFirstArg) {
+builtin_cdr(int indexOfFirstArg) {
     OBJ arg;
 
     checkNumberOfArguments("cdr", 1);
@@ -241,6 +242,44 @@ scm_cdr(int indexOfFirstArg) {
     }
     POPARGS();
     return cdr(arg);
+}
+
+//
+// destructively change the car of a given cons cell
+// ATTENTION: non-functional and therefore dangerous
+//
+OBJ
+builtin_setcar(int indexOfFirstArg) {
+    OBJ arg1;
+
+    checkNumberOfArguments("set-car!", 2);
+
+    arg1 = ARG(0);
+    if (!isCons(arg1)) {
+	error("[set-car!] argument is not a cons cell:", arg1);
+    }
+    set_car(arg1, ARG(1));
+    POPARGS();
+    return SCM_VOID;
+}
+
+//
+// destructively change the cdr of a given cons cell
+// ATTENTION: non-functional and therefore dangerous
+//
+OBJ
+builtin_setcdr(int indexOfFirstArg) {
+    OBJ arg1;
+
+    checkNumberOfArguments("set-cdr!", 2);
+
+    arg1 = ARG(0);
+    if (!isCons(arg1)) {
+	error("[set-cdr!] argument is not a cons cell:", arg1);
+    }
+    set_cdr(arg1, ARG(1));
+    POPARGS();
+    return SCM_VOID;
 }
 
 ///////////////////////////////////////////////
@@ -254,7 +293,7 @@ scm_cdr(int indexOfFirstArg) {
 //      false otherwise
 //
 OBJ
-scm_stringEqual(int indexOfFirstArg) {
+builtin_stringEqual(int indexOfFirstArg) {
     checkNumberOfArguments("string-equal?", 2);
 
     fatal("unimpl.");
@@ -269,7 +308,7 @@ scm_stringEqual(int indexOfFirstArg) {
 //      return character at idx (as character object)
 //
 OBJ
-scm_stringRef(int indexOfFirstArg) {
+builtin_stringRef(int indexOfFirstArg) {
     checkNumberOfArguments("string-ref", 2);
 
     fatal("unimpl.");
@@ -286,7 +325,7 @@ scm_stringRef(int indexOfFirstArg) {
 //      return void
 //
 OBJ
-scm_stringSet(int indexOfFirstArg) {
+builtin_stringSet(int indexOfFirstArg) {
     checkNumberOfArguments("string-set!", 3);
 
     fatal("unimpl.");
@@ -296,17 +335,28 @@ scm_stringSet(int indexOfFirstArg) {
 // i/o functions
 ///////////////////////////////////////////////
 
-OBJ
-xxx_display(int indexOfFirstArg) {
+static OBJ
+builtin_display(int indexOfFirstArg) {
     checkNumberOfArguments("display", 1);
+
+    scm_display(ARG(0), stdout);
+    POPARGS();
+    return SCM_VOID;
+}
+
+static OBJ
+builtin_print(int indexOfFirstArg) {
+    checkNumberOfArguments("print", 1);
 
     scm_print(ARG(0), stdout);
     POPARGS();
     return SCM_VOID;
 }
 
+#ifdef RECURSIVE
+
 OBJ
-scm_load(int indexOfFirstArg) {
+builtin_load(int indexOfFirstArg) {
     char *fileName;
 
     checkNumberOfArguments("load", 1);
@@ -327,6 +377,8 @@ scm_load(int indexOfFirstArg) {
     return SCM_VOID;
 }
 
+#endif
+
 ///////////////////////////////////////////////
 // predicate functions
 ///////////////////////////////////////////////
@@ -335,40 +387,40 @@ scm_load(int indexOfFirstArg) {
 //      true if o is a number (for now: an integer)
 //
 OBJ
-scm_numberP(int indexOfFirstArg) {
+builtin_numberP(int indexOfFirstArg) {
     checkNumberOfArguments("number?", 1);
 
     return isNumber(ARG(0)) ? SCM_TRUE : SCM_FALSE;
 }
 
 OBJ
-scm_integerP(int indexOfFirstArg) {
+builtin_integerP(int indexOfFirstArg) {
     checkNumberOfArguments("integer?", 1);
 
     return isInteger(ARG(0)) ? SCM_TRUE : SCM_FALSE;
 }
 
 OBJ
-scm_floatP(int indexOfFirstArg) {
+builtin_floatP(int indexOfFirstArg) {
     fatal("unimpl.");
 }
 
 OBJ
-scm_stringP(int indexOfFirstArg) {
+builtin_stringP(int indexOfFirstArg) {
     checkNumberOfArguments("string?", 1);
 
     return isString(ARG(0)) ? SCM_TRUE : SCM_FALSE;
 }
 
 OBJ
-scm_symbolP(int indexOfFirstArg) {
+builtin_symbolP(int indexOfFirstArg) {
     checkNumberOfArguments("symbol?", 1);
 
     return isSymbol(ARG(0)) ? SCM_TRUE : SCM_FALSE;
 }
 
 OBJ
-scm_consP(int indexOfFirstArg) {
+builtin_consP(int indexOfFirstArg) {
     checkNumberOfArguments("cons?", 1);
 
     return isCons(ARG(0)) ? SCM_TRUE : SCM_FALSE;
@@ -376,38 +428,43 @@ scm_consP(int indexOfFirstArg) {
 
 void
 initializeBuiltinFunctions() {
-    defineBuiltinFunction("+", scm_plus);
-    defineBuiltinFunction("-", scm_minus);
-    defineBuiltinFunction("*", scm_times);
-    defineBuiltinFunction("/", scm_quotient);
+    defineBuiltinFunction("+", builtin_plus);
+    defineBuiltinFunction("-", builtin_minus);
+    defineBuiltinFunction("*", builtin_times);
+    defineBuiltinFunction("/", builtin_quotient);
 
-    defineBuiltinFunction("bitwise-and", scm_bitwise_and);
-    defineBuiltinFunction("bitwise-or", scm_bitwise_or);
-    defineBuiltinFunction("bitwise-xor", scm_bitwise_xor);
+    defineBuiltinFunction("bitwise-and", builtin_bitwise_and);
+    defineBuiltinFunction("bitwise-or", builtin_bitwise_or);
+    defineBuiltinFunction("bitwise-xor", builtin_bitwise_xor);
 
-    defineBuiltinFunction("eq?", scm_eq);
+    defineBuiltinFunction("eq?", builtin_eq);
 
-    defineBuiltinFunction("=", scm_eqNr);
-    defineBuiltinFunction("<", scm_lessNr);
-    defineBuiltinFunction("<=", scm_lessEqualNr);
-    defineBuiltinFunction(">", scm_greaterNr);
-    defineBuiltinFunction(">=", scm_greaterEqualNr);
+    defineBuiltinFunction("=", builtin_eqNr);
+    defineBuiltinFunction("<", builtin_lessNr);
+    defineBuiltinFunction("<=", builtin_lessEqualNr);
+    defineBuiltinFunction(">", builtin_greaterNr);
+    defineBuiltinFunction(">=", builtin_greaterEqualNr);
 
-    defineBuiltinFunction("string-equal", scm_stringEqual);
-    defineBuiltinFunction("string-ref", scm_stringRef);
-    defineBuiltinFunction("string-set!", scm_stringSet);
+    defineBuiltinFunction("string-equal", builtin_stringEqual);
+    defineBuiltinFunction("string-ref", builtin_stringRef);
+    defineBuiltinFunction("string-set!", builtin_stringSet);
 
-    defineBuiltinFunction("cons", scm_cons);
-    defineBuiltinFunction("car", scm_car);
-    defineBuiltinFunction("cdr", scm_cdr);
+    defineBuiltinFunction("cons", builtin_cons);
+    defineBuiltinFunction("car", builtin_car);
+    defineBuiltinFunction("cdr", builtin_cdr);
+    defineBuiltinFunction("set-car!", builtin_setcar);
+    defineBuiltinFunction("set-cdr!", builtin_setcdr);
 
-    defineBuiltinFunction("cons?", scm_consP);
-    defineBuiltinFunction("symbol?", scm_symbolP);
-    defineBuiltinFunction("string?", scm_stringP);
-    defineBuiltinFunction("number?", scm_numberP);
-    defineBuiltinFunction("integer?", scm_integerP);
-    defineBuiltinFunction("float?", scm_floatP);
+    defineBuiltinFunction("cons?", builtin_consP);
+    defineBuiltinFunction("symbol?", builtin_symbolP);
+    defineBuiltinFunction("string?", builtin_stringP);
+    defineBuiltinFunction("number?", builtin_numberP);
+    defineBuiltinFunction("integer?", builtin_integerP);
+    defineBuiltinFunction("float?", builtin_floatP);
 
-    defineBuiltinFunction("display", xxx_display);
-    defineBuiltinFunction("load", scm_load);
+    defineBuiltinFunction("display", builtin_display);
+    defineBuiltinFunction("print", builtin_print);
+#ifdef RECURSIVE
+    defineBuiltinFunction("load", builtin_load);
+#endif
 }

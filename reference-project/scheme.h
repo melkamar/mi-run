@@ -83,6 +83,7 @@ struct schemeStringStream {
 typedef OBJ (*OBJFUNC)();
 // typedef void (*VOIDFUNC)();
 typedef void* (*VOIDPTRFUNC)();
+typedef VOIDPTRFUNC* (*VOIDFUNCPTRFUNC)();
 // typedef VOIDPTRFUNC (*VOIDPTRFUNCFUNC)();
 
 struct schemeBuiltinFunction {
@@ -93,7 +94,11 @@ struct schemeBuiltinFunction {
 
 struct schemeBuiltinSyntax {
     enum schemeTag tag;
+#ifdef RECURSIVE
     OBJFUNC code;
+#else
+    VOIDFUNCPTRFUNC code;
+#endif
     char *nameString;
 };
 
@@ -156,7 +161,7 @@ extern OBJ globalEnvironment;
 extern OBJ *stack;
 extern int SP, currentStackSize;
 
-extern VOIDPTRFUNC *returnStack;
+extern VOIDFUNCPTRFUNC *returnStack;
 extern int RSP, currentReturnStackSize;
 
 OBJ RETVAL;
@@ -246,7 +251,17 @@ cdr(OBJ o) {
     return o->cons.cdr;
 }
 
-static inline
+static inline void
+set_car(OBJ cons, OBJ newCar) {
+    cons->cons.car = newCar;
+}
+
+static inline void
+set_cdr(OBJ cons, OBJ newCar) {
+    cons->cons.cdr = newCar;
+}
+
+static inline void
 PUSH(OBJ o) {
     stack[SP++] = o;
     if (SP >= currentStackSize) {
@@ -262,15 +277,15 @@ POP() {
     return stack[--SP];
 }
 
-static inline
-PUSH_RET(VOIDPTRFUNC retAddr) {
+static inline void
+PUSH_RET(VOIDFUNCPTRFUNC retAddr) {
     returnStack[RSP++] = retAddr;
     if (RSP >= currentReturnStackSize) {
 	growReturnStack();
     }
 }
 
-static inline VOIDPTRFUNC
+static inline VOIDFUNCPTRFUNC
 POP_RET() {
     if (RSP == 0) {
 	fatal("oops - return stack underflow");
@@ -278,24 +293,34 @@ POP_RET() {
     return returnStack[--RSP];
 }
 
+static inline void
+PUSH_INT(int someInt) {
+    PUSH_RET( (VOIDFUNCPTRFUNC)(long)someInt );
+}
+
+static inline int
+POP_INT() {
+    return (int)(long)(POP_RET());
+}
+
 #define CALL(fn, cont) \
     { \
-	PUSH_RET((VOIDPTRFUNC)cont); \
-	return (VOIDPTRFUNC)fn;      \
+	PUSH_RET((VOIDFUNCPTRFUNC)cont); \
+	return (VOIDFUNCPTRFUNC)fn;      \
     }
 
 #define TCALL(fn) \
     { \
-	return (VOIDPTRFUNC)fn;      \
+	return (VOIDFUNCPTRFUNC)fn;      \
     }
 
 #define JUMP(fn) \
     { \
-	return (VOIDPTRFUNC)fn;      \
+	return (VOIDFUNCPTRFUNC)fn;      \
     }
 
 #define RETURN(retVal) \
     { \
 	RETVAL = retVal; \
-	return (VOIDPTRFUNC)POP_RET();      \
+	return (VOIDFUNCPTRFUNC)POP_RET();      \
     }

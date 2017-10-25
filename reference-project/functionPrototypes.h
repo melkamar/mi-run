@@ -1,21 +1,32 @@
 OBJ scm_read(OBJ inStream);
-void scm_print(OBJ expr, FILE* outStream);
-void scm_display(OBJ expr, FILE* outStream);
 void scm_printOrDisplay(OBJ expr, FILE* outStream, bool);
+#define scm_print(expr, outStream)   scm_printOrDisplay(expr, outStream, C_FALSE)
+#define scm_display(expr, outStream) scm_printOrDisplay(expr, outStream, C_TRUE)
 
-OBJ scm_eval(OBJ expr, OBJ env);
 OBJ scm_evalCString(char *expressionString);
 
+#ifdef RECURSIVE
+OBJ scm_eval(OBJ expr, OBJ env);
+#else
+OBJ trampoline(VOIDFUNCPTRFUNC fn);
+VOIDFUNCPTRFUNC CP_readEvalPrintLoop();
+VOIDFUNCPTRFUNC CP_eval();
+#endif
+
 OBJ new_stringStream(char* buffer);
-OBJ new_fileStream(FILE*);
+OBJ new_fileStream(FILE* file);
 OBJ new_integer(long iVal);
-OBJ new_symbol(char*);
-OBJ really_new_symbol(char*);
-OBJ new_string(char*);
-OBJ new_singleton(schemeTag);
-OBJ new_cons(OBJ, OBJ);
+OBJ new_symbol(char* symbolChars);
+OBJ really_new_symbol(char* symbolChars);
+OBJ new_string(char* stringChars);
+OBJ new_singleton(schemeTag tag);
+OBJ new_cons(OBJ car, OBJ cdr);
 OBJ new_builtinFunction(OBJFUNC code, char*);
-OBJ new_builtinSyntax(OBJFUNC code, char*);
+#ifdef RECURSIVE
+OBJ new_builtinSyntax(OBJFUNC func, char* name);
+#else
+OBJ new_builtinSyntax(VOIDFUNCPTRFUNC func, char* name);
+#endif
 OBJ new_userDefinedFunction(OBJ argList, OBJ bodyList, OBJ homeEnv);
 OBJ new_globalEnvironment(int size);
 
@@ -33,6 +44,7 @@ void error(char* message, OBJ optionalObjectOrNULL);
 void argumentCountError(char* functionName, int numExpected, int numGiven, bool variableNumArgs);
 
 int nextPrimeAfter(int nr);
+int length(OBJ list);
 
 void initializeSymbolTable();
 void initializeGlobalEnvironment();
@@ -45,8 +57,10 @@ OBJ getGlobalValue(OBJ env, OBJ symbol);
 void defineGlobalValue(OBJ env, OBJ symbol, OBJ newValue);
 
 void defineBuiltinFunction(char* name, OBJFUNC code);
+#ifdef RECURSIVE
 void defineBuiltinSyntax(char* name, OBJFUNC code);
+#else
+void defineBuiltinSyntax(char* name, VOIDFUNCPTRFUNC code);
+#endif
 
-void trampoline(VOIDPTRFUNC fn);
-VOIDPTRFUNC CP_readEvalPrintLoop();
-VOIDPTRFUNC CP_scm_eval();
+void selftest();

@@ -26,6 +26,42 @@ scm_printList(OBJ expr, FILE* outStream, bool asDisplay) {
     }
 }
 
+//
+// print and display are similar;
+// display is meant for the user,
+// whereas print is meant for a program.
+// Strings printed by print can be reconstructed by the reader
+// (they have double quotes around)
+//
+static void
+printWithStringEscapes(char* s, FILE* outStream) {
+    char ch;
+
+    while ((ch = *s++) != '\0') {
+	switch (ch) {
+	    case '\n':
+		putc('\\', outStream);
+		ch = 'n';
+		break;
+	    case '\t':
+		putc('\\', outStream);
+		ch = 't';
+		break;
+	    case '\r':
+		putc('\\', outStream);
+		ch = 'r';
+		break;
+	    case '"':
+	    case '\\':
+		putc('\\', outStream);
+		break;
+	     default:
+		break;
+	}
+	putc(ch, outStream);
+    }
+}
+
 void
 scm_printOrDisplay(OBJ expr, FILE* outStream, bool doDisplay) {
     switch (tagOf(expr)) {
@@ -38,10 +74,12 @@ scm_printOrDisplay(OBJ expr, FILE* outStream, bool doDisplay) {
 	    return;
 
 	case T_STRING:
-	    if (!doDisplay) {
+	    if (doDisplay) {
 		fprintf(outStream, "%s", stringVal(expr));
 	    } else {
-		fprintf(outStream, "\"%s\"", stringVal(expr));
+		fprintf(outStream, "\"");
+		printWithStringEscapes(stringVal(expr), outStream);
+		fprintf(outStream, "\"");
 	    }
 	    return;
 
@@ -85,18 +123,12 @@ scm_printOrDisplay(OBJ expr, FILE* outStream, bool doDisplay) {
 	    fprintf(outStream, "<the global env>");
 	    return;
 
+	case T_LOCALENVIRONMENT:
+	    fprintf(outStream, "<an env>");
+	    return;
+
 	default:
 	    fatal("unimplemented: printing of this object");
     }
 
-}
-
-void
-scm_print(OBJ expr, FILE* outStream) {
-    scm_printOrDisplay(expr, outStream, C_FALSE);
-}
-
-void
-scm_display(OBJ expr, FILE* outStream) {
-    scm_printOrDisplay(expr, outStream, C_TRUE);
 }

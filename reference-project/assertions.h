@@ -1,4 +1,4 @@
-#define _assert(cond, msg, filename, lineNr) \
+#define _ASSERT(cond, msg, filename, lineNr) \
     { \
 	if (! (cond)) { \
 	    fprintf(stderr, "%s[%d]: assertion failed: %s\n", filename, lineNr, msg); \
@@ -6,10 +6,10 @@
 	} \
     }
 
-#define assert(cond, message) _assert(cond, message, __FILE__, __LINE__)
+#define ASSERT(cond, message) _ASSERT(cond, message, __FILE__, __LINE__)
 
-#define assert_eq(expr, expected, message) _assert(expr==expected, message, __FILE__, __LINE__)
+#define ASSERT_eq(expr, expected, message) _ASSERT(expr==expected, message, __FILE__, __LINE__)
 
-#define assert_true(expr, message) assert_eq(expr, SCM_TRUE, message)
+#define ASSERT_true(expr, message) ASSERT_eq(expr, SCM_TRUE, message)
 
-#define assert_false(expr, message) assert_eq(expr, SCM_FALSE, message)
+#define ASSERT_false(expr, message) ASSERT_eq(expr, SCM_FALSE, message)
