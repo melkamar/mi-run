@@ -220,3 +220,52 @@ pokud vrátí něco jinýho, pak se z něj vracím nějakým errorem.
 tak se dá obejít bez alokování dalších a dalších stacků
 
 - bootstrap "trampoline" - volá první funkci na stacku
+
+# Druhý týden
+
+## Interpretace bytecode místo AST
+
+Převod ast -> bc, projdu strom a zhruba:
+foreach node:
+    is const? -> emit PUSH_CONST arg
+    is variable? -> emit PUSH_LOCAL arg
+    ...
+    else compile_call arg:
+
+compile_call:
+    if builtin? -> compile_builtin
+
+compile_builtin:
+    compile_args (push args on the stack recursively)
+
+    if + -> emit ADD
+    if * -> emit multiply
+    ...
+
+        ex. strom:
+            _________________
+           |                 |
+           |         +       |
+           |                 |
+           |   *           b |
+           |                 |
+           | a   10          |
+           |_________________|
+
+
+        z toho bude:
+            PUSH_ARG 0
+            PUSH_CONST 10
+            MUL
+            PUSH_ARG 1
+            ADD
+
+Viz `compiler.scm`
+
+
+Přidává se bytecodeInterpreter.c - interpreter umí evaluovat jak
+klasický AST, tak i fce, které mají pro sebe definovaný bytecode.
+
+Má to bejt tak, že zavolam fci - provede se klasicky. Případně můžu místo funkce
+nadefinovat bytecode a pak se začne provádět ten.
+
