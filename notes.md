@@ -269,3 +269,182 @@ klasický AST, tak i fce, které mají pro sebe definovaný bytecode.
 Má to bejt tak, že zavolam fci - provede se klasicky. Případně můžu místo funkce
 nadefinovat bytecode a pak se začne provádět ten.
 
+#### 5. přednáška
+
+kompilace if-then-else - backpatching
+
+## Garbage Collection
+
+Tomato meatball-spaghetti soup picture. Stačí si to pamatovat, a každej pochopí garbage collection.
+
+- Když mám nějakej objekt v polívce, kterej není dostupnej z
+    - Global table
+    - Stack
+  tak už je to garbage, nemůžu ho nikdy dál použít.
+
+- Těmhle dvěma se říká "roots"
+
+#### Mark & Sweep
+
+- Pošlu mravence z rootu, on jde rekurzivně přes všechny reference z objektů
+  které ještě nejsou označené. Když potká novou, vysere se na ní (cituji).
+- Prostě DFS.
+- Má to dvě fáze:
+    - Mark - DFS, označuju objekty
+    - Sweep - projdu všechny objekty co na sobě nemají hovno (cituji) a
+      dám je do "free listu", odkud pak můžu brát paměť.
+
+- Nejlepší je prostě vzít si chunk paměti, víc než potřebuju, a pak v
+  něm ručně alokovat.
+- Když budu mít chunk plnej a budu chtít další objekty, udělám sweep a
+  uvolním místo.
+- Free list implementuju jako jeden pointer do naší paměti a pak
+  zřetězenej seznam (cca jako FAT).
+- Existujou nějaký vylepšení tohohle algoritmu, dělení paměti na
+  segmenty atd. ale furt to nebude moc dobrý. Budem mít něco lepšího.
+- Tady je problém (mimo jiné) že default implementace není realtime -
+  musim zastavit program, zatímco se dělá m&s.
+
+- Výhody: jednoduchý, zvládá to cykly
+- Nevýhody: pomalý, blokující, velká O() komplexita
+
+- Kdy volat mark and sweep?
+    - První nápad: když dojde paměť v našem bloku. Ale to je prej blbý.
+      Navíc, když tvořím nový složený objekty, musí bejt vždycky na stacku.
+      Může se mi stát např. `new_cons(new_symbol(), new_cons())` - tady
+      si v C vytvořím new_cons() a new_symbol(), ale než se provede new_cons, může přijít GC a sežrat mi to.
+
+    - Lepší: mám segmenty, když dojde paměť, naalokuju další blok, ale
+      pamatuju si, že mám ten předchozí vyčistit. Tady navíc mám
+      možnost zavolat GC kdy potřebuju - když to zavolám v trampolíně,
+      mám to bezpečný, protože když jsem v metodě trampolíny, všechno
+      musí bejt na stacku.
+
+#### Reference counting
+
+- Každej objekt má interní variable - počet referencí na něj. Klasicky.
+- Kdykoliv objekt dojde na 0 referencí, tak se zabije a sníží reference
+  svým objektům.
+
+- Výhody: objekty jsou uvolňované, hned jak se stanou nereferencovanýma.
+          můžu finalizovat objekty, na který mam reference, např. file handly.
+- Nevýhody:
+    - Může být blokující - pokud jsem se zbavil obrovskýho stromu,
+            tak rekurzivně musim zničit všechny nody. Ale je to řešitelný,
+            delayed decrement.
+    - Ale performance je hrozná. Overhead M&S
+            busy programu je cca 5-15%. Tady to ale může bejt až 50%.
+            Při každý operaci s pointerem, i třeba při průchodu polem,
+            musím projít celej strom referencí od tohohle pointeru a
+            upravit počet.
+    - Memory - můžu mít teoreticky miliardy objektů (64bit), a musím
+               být schopen takový číslo narvat do čítače referencí. Dá
+               se to ohacknout, budu mít jedinej bajt, protože většině
+               objektů to stačí. Pokud překročím 254, prostě tam necham
+               255 a dám objekt do overflow table, kde si pak pamatuju
+               počty pro všechny takovýhle vzácný objekty. Kdykoliv
+               najdu 255 v počitači referencí, musím se podívat do tabulky.
+    - Cykly nebudou nikdy zcollectovaný. To se pak nechává na
+    programátorech - musí se zbavit cyklus linků. Ale to to degraduje
+    na manuální alokaci. -> refcounter alg prostě nestačí. Pak se musí
+    doplňovat občas m&s nebo cycle-breaker toolem. A to je další overhead.
+
+Pro performance je špatný mít v kritickým kódu branchování.
+
+#### Tracing algoritmus - Baker
+
+- Vezmu všechny rooty a přesunu je do jiný polívky (spolu s nima i to s čím jsou spojený)
+- To co zůstane, není referencovaný.
+
+- U každýho objektu budu mít bit "copied". Pokud je ten bit 1, už mám
+  tenhle objekt zkopírovanej, budu mít v jeho těle adresu na ten
+  skutečně zkopírovanej, kterej můžu použít.
+
+- Kopíruju:
+    - Začnu z rootu, zkopíruju objekt kam pointuje. Označím jako copied,
+    reference z původního neplatí, ty jsem zahodil, ale platí ty z kopie.
+    - Takhle dokola pro všechny rooty.
+    - V cílovým bufferu mám alloc pointer - ukazuje na free místo; a
+      scan pointer, kterej začíná na 0. Pokud ScanP == AP, pak jsem
+      skončil.
+    - Pokud scanp<ap, tak: vezmu všechny reference současného scanp co
+      pointujou do staré polívky. Pokud je cílový objekt skutečně ve staré
+      tabulce, tak ho zkopíruju a upravim reference. Pokud je cílový objekt
+      už zkopírovaný (má flag a referenci), pak jenom nastavím referenci
+      pro tenhle objekt. Musím taky zprocesovat všechny reference tohohle
+      starýho objektu.
+
+- Tady doba běhu záleží jenom na počtu live objektů, garbage to vůbec
+nezpomaluje --> O(live)
+- Zároveň tohle defragmentuje paměť, po každým průběhu mám objekty
+nahoře a kus paměti volnej.
+- Ale, všechny live objekty musím pořád kopírovat. Není to ale tak
+hrozný, čtení objektu je cca stejný jako kopírování. Musím objekt dostat
+do cache, CPU pak na zápis jenom řekne "zapiš asynchronně" a jede dál.
+Čtení je blokující, zápis je easy, skoro nula.
+
+##### Vylepšení - Generation Scavenging
+
+- Unger si všimnul, že pravděpodobnost že bude danej objekt zcollectovanej
+klesá s jeho stářím. Tj. pokud mám objekt kterej žije už dvě hodiny, nejspíš přežije.
+Naproti tomu, objekt kterej zrovna vzniknul bude dost možná sebranej.
+- Takže rozdělím objekty do skupin podle stáří:
+    - Newspace:
+        - Eden - fresh objekty
+        - Survivors - ti, co přežili garbage collection v Edenu
+        - Mám dva poty, ty se navzájem střídají v rolích.
+        - Každý objekt má AGE field - v něm si držím počet GC, který
+        přežil.
+        - Pokud daný objekt přežil dostatek GC (nějaký threshold, ve
+        smalltalk IDE Clause je to 29), tak ho napříště zkopíruju
+        do OLD potu. Threshold je adaptivní, závisí na tom, jak moc je
+        plnej pot po zkopírování objektů. Když je skoro plnej, tak jich
+        pošlu víc do OLD a naopak. (OLD=Tenure)
+        - Navíc, např. file descriptory nikdy nepřijdou do OLD, protože
+        to by pak mohlo trvat moc dlouho, než by se zcollectovaly.
+        Označím si je a řeknu že zůstanou young.
+
+- V grafu vidim vývoj paměti jako pilu - young roste, roste a pak dolů když GC.
+- OLD pot je pro mě taky pot rootů (kromě env a stack). Ale nechci procházet
+  celej OLD pot (řádově 1GB vs 16 MB young potu), to by bylo moc drahý.
+    - budu si držet tabulku objektů, který jsou "asi" rooty (tj. mají reference do young)
+      můžu tam ale mít objekty, který rooty nejsou, je to relaxovaná podmínka
+      -> Remembered Set
+    - Do tohohle setu přidám objekty:
+        - který kopíruju (tenuruju) do OLD
+        - objekty, u kterých volám settery (nová reference může bejt do young)
+    - Pro každej store musím mít write-barrier
+    - Při dalším scavengi (GC) projdu všechny obj z remembered setu,
+    a když žádná jejich reference nemíří do young potu, tak je ze setu vyndam.
+
+- ALE když potřebuju GC na OLD potu, nebudu to dělat timhle algoritmem, protože bych
+musel překopírovávat 1GB+ paměti, to je pomalý.
+
+- DONT POOL! tady to dělá větší overhead. Původně měla java M&S a dostala špatný jméno.
+Teď už je to v pohodě.
+- Potů může bejt víc, jsou poty pro symboly, fce, lambdy, atd.
+
+- Problém - *early tenure*
+    - Přesunul jsem objekt do OLD, ale hned za chvíli umře.
+
+- Worst case scenario pro algoritmus:
+    - Všechno v edenu přežije, postupně mi dochází paměť v new -
+        pořád něco kopíruju tam a zpátky, a moc paměti nezískávám.
+    - Proto dynamicky, např.
+        - 95% plný -> threshold bude 1, všechno zkopíruju
+        - 90% plný -> např. 2
+        - atd.
+        - A naopak, pokud je to prakticky prázdný, nechci nic dávat do OLD.
+
+    - Hodnoty jsou jakási heuristika, záleží na aplikaci.
+
+
+#### Tricolor marking - neblokující Mark&Sweep
+- Mám tři barvy, bílá, šedá, černá
+- Mark fáze je pořád stejně, označuju bílá -> černá
+- Program pořád běží v pozadí, ale když použiju nějakej objekt co je černej, změním
+  ho na šedý a přidám do todo listu. Když Mark komplet doběhne, podívá
+  se do todo listu - jestli tam něco je, tak tam skočím a půjdu po šedých/bílých a barvím do černa.
+- Když program mezitím zase něco program zapíše, zas to dá na todo a tak furt dokola.
+- Když bojuju s programem o pár objektů v todo listu, po čase prostě řeknu zdar, program zastavím a dodělám GC.
+- Nevýhoda je fragmentace paměti. Můžu to řešit background jobem co mi kopíruje objekty v paměti k sobě.
