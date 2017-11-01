@@ -448,3 +448,50 @@ Teď už je to v pohodě.
 - Když program mezitím zase něco program zapíše, zas to dá na todo a tak furt dokola.
 - Když bojuju s programem o pár objektů v todo listu, po čase prostě řeknu zdar, program zastavím a dodělám GC.
 - Nevýhoda je fragmentace paměti. Můžu to řešit background jobem co mi kopíruje objekty v paměti k sobě.
+
+# 6. přednáška
+
+Trik, abych nemusel pro každej int alokovat novej objekt -
+- Všechny pointery jsou zarovnvaný na int, ten má 32bitů. Na konci
+  adresy vždycky budou dvě nuly.
+- Když mám dostatečně malej integer, kterej se vejde do 31 bitů, tak
+  zneužiju pointer -> řeknu si, pokud je poslední bit pointeru 1, tak
+  to budu považovat za přímou hodnotu intu, tj. udělam posun doprava a mam číslo.
+- Když má poslední bit 0, tak to je klasická adresa a dereferencuju.
+- *Tagged integers*
+
+## JIT
+#### Code generation - template based
+- Každá instrukce bytekódu se přeloží na sekvenci strojových instrukcí
+- Tady je problém, že nevím co bude za instrukce. Stack bude bottleneck,
+  protože nejsem schopnej inteligentně říct, do jakých registrů dávat co, tak to řeším přes stack.
+
+#### Abstract interpretation
+- V JITu se chovám skoro jako bych vykonával instrukce.
+- Simuluju stav, ve kterým by počítač byl ve chvíli kdy to vykonávám
+    - "Stack state"
+    - "Register state"
+    - V programu si držím datovou strukturu, kde mám napsáno co je v
+      jakém registru.
+    - Ve chvíli kdy zavolám "PUSH_ARG", tak hned negeneruju kód, ale jenom
+      si to uložím do stack state - simulace stacku. Tohle dělám dokud
+      nepotřebuju hodnoty.
+    - Přijde instrukce co potřebuje hodnotu - ADD. Ok, vím že potřebuju
+      dvě hodnoty. Najdu si free registry, zarezervuju, a vygeneruju kód
+      na load hodnoty do těch registrů.
+    - Stav registrů si držím v simulovaným stacku, efektivně řeším
+      obsazení registrů
+
+#### Inline cache
+Nechci skákat po třídách, držím si machine kód metod u sebe
+
+# Literatura
+- Baker - uniprocessor garbage collection algorithms
+- Abelson, Sussman - Structure & Interpretation of Computer Programs (MIT povinný čtení) + je to na youtube (tuhle by si prej klaus vzal na opuštěnej ostrov!)
+- Podívat se na Haskell (tam je "lazy předávání parametrů" - všude se předávají lambdy), ML, OZ/Mozart
+- Ph.D. thesis Dave Unger - SOAR
+
+# Kontakt
+- cg@exept.de - Klaus
+- bg@ - wife
+- info@
