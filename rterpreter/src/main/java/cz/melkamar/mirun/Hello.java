@@ -45,7 +45,7 @@ public class Hello {
 //    }
 
     public static void main(String[] args) throws Exception {
-        String inputFile = "D:\\cvut-checkouted\\mi-run\\pyterpreter\\src\\main\\resources\\foo.r";
+        String inputFile = "D:\\cvut-checkouted\\mi-run\\rterpreter\\src\\main\\resources\\foo.r";
         if (args.length > 0) inputFile = args[0];
         InputStream is = System.in;
         if (inputFile != null) {
