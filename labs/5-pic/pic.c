@@ -100,6 +100,9 @@ Function* createFunction(char* n, Object*(*f)(Object*)) {
 
 typedef Object*(*o2o)(Object*);
 
+
+
+
 int lookupInvocations = 0;
 
 o2o lookupCalee(Object* o, char* fn) {
@@ -120,11 +123,66 @@ o2o lookupCalee(Object* o, char* fn) {
     return NULL;
 }
 
+#define CACHE_STATE_EMPTY 0
+#define CACHE_STATE_ONE 1
+#define CACHE_STATE_TWO 2
+typedef struct PicCache Cache;
+struct PicCache {
+    int state;
+
+    int cachedType;
+    o2o cachedFuncImpl;
+
+    int secondCachedType;
+    o2o secondCachedFuncImpl;
+};
+
+Cache printCache;
+
+o2o lookupCache(Object* o, char* fn){
+    o2o func;
+
+    switch (printCache.state){
+        case CACHE_STATE_EMPTY:
+            func = lookupCalee(o, fn);
+            printCache.cachedType = o->typeId;
+            printCache.cachedFuncImpl = func;
+            printCache.state = CACHE_STATE_ONE;
+            return func;
+
+        case CACHE_STATE_ONE:
+            if (printCache.cachedType == o->typeId){
+                return printCache.cachedFuncImpl;
+            } else {
+                func = lookupCalee(o, fn);
+                printCache.secondCachedType = o->typeId;
+                printCache.secondCachedFuncImpl = func;
+                printCache.state = CACHE_STATE_TWO;
+                return func;
+            }
+
+        case CACHE_STATE_TWO:
+            if (printCache.cachedType == o->typeId){
+                return printCache.cachedFuncImpl;
+            } else if (printCache.secondCachedType == o->typeId) {
+                return printCache.secondCachedFuncImpl;
+            } else {
+                return lookupCache(o, fn);
+            }
+
+        default:
+            fprintf(stderr, "default cache lookup case, something is wrong.");
+            return NULL;
+    }
+
+
+}
+
 
 
 // "call site" - tady to budu měnit
 Object* invokeFunction(Object* o, char* fn) {
-    Object*(*calee)(Object*) = lookupCalee(o, fn);
+    Object*(*calee)(Object*) = lookupCache(o, fn);
     if (calee != NULL) {
         calee(o);
     } else {
